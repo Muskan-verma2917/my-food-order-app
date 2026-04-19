@@ -14,19 +14,27 @@ const database = firebase.database();
 const dbOrders = database.ref('orders');
 const dbCounter = database.ref('orderCounter');
 
+// --- TIMEZONE DATE FIX ---
+function getLocalIsoDate() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
 let allOrders = [];
 let currentFilter = 'All';
-let currentFilterDate = new Date().toISOString().slice(0, 10);
+let currentFilterDate = getLocalIsoDate(); // Fixed Indian Date
 let orderCounter = 0;
 let pendingDelete = null;
 
 const defaultConfig = { app_title: 'Daily Delivery Sales', background_color: '#0f1117' };
 const $ = id => document.getElementById(id);
-const today = new Date();
-$('date-filter').valueAsDate = today;
 
-// --- FIREBASE LIVE LISTENERS (Jadoo yahan hota hai) ---
-// Jab bhi kisi phone ya laptop par data add hoga, ye khud chal jayega!
+if ($('date-filter')) {
+  $('date-filter').value = currentFilterDate;
+}
+
+// --- FIREBASE LIVE LISTENERS ---
 dbOrders.on('value', (snapshot) => {
   const data = snapshot.val();
   allOrders = [];
@@ -162,7 +170,7 @@ window.handlePremiumFormSubmit = function(event) {
       finalPaymentMode = `Split: Cash ₹${splitCash.toFixed(2)} | UPI ₹${splitUpi.toFixed(2)}`;
     }
 
-    const orderDate = $('date-filter') && $('date-filter').value ? $('date-filter').value : new Date().toISOString().split('T')[0];
+    const orderDate = $('date-filter') && $('date-filter').value ? $('date-filter').value : getLocalIsoDate();
 
     // Increase counter in Firebase
     orderCounter++;
@@ -174,10 +182,10 @@ window.handlePremiumFormSubmit = function(event) {
       let status = "Payment Pending";
       if (paymentMode === "UPI Done" || paymentMode === "Cash" || paymentMode === "Split") status = "Delivered";
       
-      const newOrderRef = dbOrders.push(); // Create a new unique ID in Firebase
+      const newOrderRef = dbOrders.push(); 
       
       const newOrder = {
-        __backendId: newOrderRef.key, // Save key inside object for easy edit
+        __backendId: newOrderRef.key, 
         order_id: currentOrderId,
         customer_name: item.restaurant,
         item_name: item.name,
@@ -185,7 +193,7 @@ window.handlePremiumFormSubmit = function(event) {
         unit_price: item.rate,
         total: item.total,
         status: status,
-        date: new Date(orderDate).toISOString(),
+        date: orderDate, // <--- ERROR WAS HERE, NOW FIXED!
         address: address,
         customer_address: address,
         location: address,
@@ -195,7 +203,7 @@ window.handlePremiumFormSubmit = function(event) {
         delivery_charge: isFirstItem ? deliveryCharge : 0
       };
       
-      newOrderRef.set(newOrder); // Save to cloud
+      newOrderRef.set(newOrder);
       isFirstItem = false;
     }
 
@@ -223,7 +231,7 @@ window.changeStatus = function(backendId, newPaymentStatus) {
   let order = allOrders[orderIndex];
   let oldStatus = order.payment_status;
 
-  // SAFETY LOCK: UPI amount protection
+  // SAFETY LOCK
   if (newPaymentStatus === 'Cash' && (oldStatus === 'UPI Done' || oldStatus.includes('Split'))) {
       dbOrders.child(backendId).update({ status: 'Delivered' }).then(() => {
          showToast('✅ UPI Amount Protected! (Status Delivered)'); 
@@ -306,7 +314,6 @@ window.handleEditSubmit = function(event) {
         updatedData.payment_status = `Split: Cash ₹${splitCash.toFixed(2)} | UPI ₹${splitUpi.toFixed(2)}`;
     } else updatedData.payment_status = editMode;
 
-    // Send update to Cloud
     dbOrders.child(editingOrderId).update(updatedData).then(() => {
         showToast('✅ Order updated in Cloud!'); toggleEditModal(false);
         if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Save Changes'; }
@@ -318,7 +325,7 @@ window.handleEditSubmit = function(event) {
   } 
 };
 
-// --- RENDER AND STATS FUNCTIONS (Keep exactly same for UI) ---
+// --- RENDER AND STATS FUNCTIONS ---
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     currentFilter = btn.dataset.filter;
