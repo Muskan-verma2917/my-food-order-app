@@ -1,6 +1,7 @@
 {
   "name": "Daily Delivery Sales",
   "short_name": "Delivery App",
+  "description": "Daily food delivery and sales management application.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f1117",
