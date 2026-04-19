@@ -473,9 +473,9 @@ function createRow(order) {
     <td class="px-4 py-3 text-center">
       <select onchange="changeStatus('${order.__backendId}', this.value)" class="bg-transparent border rounded px-2 py-1 outline-none text-xs font-semibold cursor-pointer" style="border-color:${statusColor}; color:${statusColor};">
         <option value="Payment Pending" ${order.payment_status === 'Payment Pending' ? 'selected' : ''} style="color:#f59e0b; background:#181a24;">Payment Pending</option>
-        <option value="Cash" ${order.payment_status === 'Cash' ? 'selected' : ''} style="color:#22c55e; background:#181a24;">Delivered</option>
-        <option value="UPI Done" ${order.payment_status === 'UPI Done' ? 'selected' : ''} style="color:#3b82f6; background:#181a24;">UPI Done</option>
-        ${(order.payment_status || '').includes('Split') ? `<option value="${esc(order.payment_status)}" selected style="color:#a855f7; background:#181a24;">Split Done</option>` : ''}
+        <option value="Cash" ${order.payment_status === 'Cash' ? 'selected' : ''} style="color:#22c55e; background:#181a24;">Delivered (Cash)</option>
+        <option value="UPI Done" ${order.payment_status === 'UPI Done' ? 'selected' : ''} style="color:#3b82f6; background:#181a24;">Delivered (UPI)</option>
+        ${(order.payment_status || '').includes('Split') ? `<option value="${esc(order.payment_status)}" selected style="color:#a855f7; background:#181a24;">Delivered (Split)</option>` : ''}
       </select>
     </td>
     <td class="px-4 py-3 text-center">
@@ -490,10 +490,29 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s || 
 window.changeStatus = function(backendId, newPaymentStatus) {
   const orderIndex = allOrders.findIndex(o => o.__backendId === backendId);
   if (orderIndex === -1) return;
-  allOrders[orderIndex].payment_status = newPaymentStatus;
-  if (newPaymentStatus === 'UPI Done' || newPaymentStatus === 'Cash') allOrders[orderIndex].status = 'Delivered';
-  else if (newPaymentStatus === 'Payment Pending') allOrders[orderIndex].status = 'Payment Pending';
-  saveLocalData(); showToast('Status updated'); updateStats(); renderOrders();
+  
+  let order = allOrders[orderIndex];
+  let oldStatus = order.payment_status;
+
+  // SAFETY LOCK: Agar already UPI ya Split tha, aur user galti se 'Cash' ("Delivered (Cash)") daba de,
+  // toh hum UPI ka paisa kam nahi hone denge!
+  if (newPaymentStatus === 'Cash' && (oldStatus === 'UPI Done' || oldStatus.includes('Split'))) {
+      order.status = 'Delivered';
+      saveLocalData(); 
+      showToast('✅ UPI Amount Protected! (Status Delivered)'); 
+      updateStats(); 
+      renderOrders();
+      return; // Yahan se aage code nahi jayega, taaki paisa na kate
+  }
+  
+  order.payment_status = newPaymentStatus;
+  if (newPaymentStatus === 'UPI Done' || newPaymentStatus === 'Cash') order.status = 'Delivered';
+  else if (newPaymentStatus === 'Payment Pending') order.status = 'Payment Pending';
+  
+  saveLocalData(); 
+  showToast('Status updated'); 
+  updateStats(); 
+  renderOrders();
 };
 
 window.requestDelete = function(backendId) { pendingDelete = backendId; renderOrders(); };
