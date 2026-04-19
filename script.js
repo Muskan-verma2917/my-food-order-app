@@ -2,6 +2,7 @@
 const firebaseConfig = {
   apiKey: "AIzaSyAa7AB13P8HLuB5cRWHhOsRAHBowcMJsc4",
   authDomain: "food-delivery-app-46de1.firebaseapp.com",
+  databaseURL: "https://food-delivery-app-46de1-default-rtdb.asia-southeast1.firebasedatabase.app", // <--- YAHAN LINK PASTE KAREIN
   projectId: "food-delivery-app-46de1",
   storageBucket: "food-delivery-app-46de1.firebasestorage.app",
   messagingSenderId: "218219407862",
@@ -23,7 +24,7 @@ function getLocalIsoDate() {
 
 let allOrders = [];
 let currentFilter = 'All';
-let currentFilterDate = getLocalIsoDate(); // Fixed Indian Date
+let currentFilterDate = getLocalIsoDate(); 
 let orderCounter = 0;
 let pendingDelete = null;
 
@@ -130,8 +131,8 @@ function showToast(msg, type='success') {
 
 function filterByDate() { currentFilterDate = $('date-filter').value; renderOrders(); updateStats(); }
 
-// --- FIREBASE SUBMIT LOGIC ---
-window.handlePremiumFormSubmit = function(event) {
+// --- FIREBASE SUBMIT LOGIC (ASYNC ADDED) ---
+window.handlePremiumFormSubmit = async function(event) {
   if (event) event.preventDefault();
   const btn = $('place-order-btn');
   if(btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.textContent = 'Saving to Cloud...'; }
@@ -172,9 +173,8 @@ window.handlePremiumFormSubmit = function(event) {
 
     const orderDate = $('date-filter') && $('date-filter').value ? $('date-filter').value : getLocalIsoDate();
 
-    // Increase counter in Firebase
     orderCounter++;
-    dbCounter.set(orderCounter);
+    await dbCounter.set(orderCounter);
     const currentOrderId = String(orderCounter).padStart(3, '0');
     
     let isFirstItem = true;
@@ -183,7 +183,6 @@ window.handlePremiumFormSubmit = function(event) {
       if (paymentMode === "UPI Done" || paymentMode === "Cash" || paymentMode === "Split") status = "Delivered";
       
       const newOrderRef = dbOrders.push(); 
-      
       const newOrder = {
         __backendId: newOrderRef.key, 
         order_id: currentOrderId,
@@ -193,7 +192,7 @@ window.handlePremiumFormSubmit = function(event) {
         unit_price: item.rate,
         total: item.total,
         status: status,
-        date: orderDate, // <--- ERROR WAS HERE, NOW FIXED!
+        date: orderDate,
         address: address,
         customer_address: address,
         location: address,
@@ -203,7 +202,7 @@ window.handlePremiumFormSubmit = function(event) {
         delivery_charge: isFirstItem ? deliveryCharge : 0
       };
       
-      newOrderRef.set(newOrder);
+      await newOrderRef.set(newOrder); // DATA EXACTLY CLOUD MEIN SAVE HOGA YAHAN
       isFirstItem = false;
     }
 
@@ -217,25 +216,23 @@ window.handlePremiumFormSubmit = function(event) {
     setTimeout(() => toggleModal(false), 500);
 
   } catch (err) {
-    console.error(err); showToast('❌ ' + err.message, 'error');
+    console.error(err); 
+    showToast('❌ Cloud Error: ' + err.message, 'error'); // AGAR ERROR AAYA TO AB LAL RANG MEIN DIKHEGA
     if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Place Order'; }
   }
 };
 
-
 // --- FIREBASE STATUS & DELETE LOGIC ---
-window.changeStatus = function(backendId, newPaymentStatus) {
+window.changeStatus = async function(backendId, newPaymentStatus) {
   const orderIndex = allOrders.findIndex(o => o.__backendId === backendId);
   if (orderIndex === -1) return;
   
   let order = allOrders[orderIndex];
   let oldStatus = order.payment_status;
 
-  // SAFETY LOCK
   if (newPaymentStatus === 'Cash' && (oldStatus === 'UPI Done' || oldStatus.includes('Split'))) {
-      dbOrders.child(backendId).update({ status: 'Delivered' }).then(() => {
-         showToast('✅ UPI Amount Protected! (Status Delivered)'); 
-      });
+      await dbOrders.child(backendId).update({ status: 'Delivered' });
+      showToast('✅ UPI Amount Protected! (Status Delivered)'); 
       return; 
   }
   
@@ -243,20 +240,19 @@ window.changeStatus = function(backendId, newPaymentStatus) {
   if (newPaymentStatus === 'UPI Done' || newPaymentStatus === 'Cash') newStatus = 'Delivered';
   else if (newPaymentStatus === 'Payment Pending') newStatus = 'Payment Pending';
   
-  dbOrders.child(backendId).update({
+  await dbOrders.child(backendId).update({
       payment_status: newPaymentStatus,
       status: newStatus
-  }).then(() => {
-      showToast('Cloud Status updated'); 
   });
+  showToast('Cloud Status updated'); 
 };
 
 window.requestDelete = function(backendId) { pendingDelete = backendId; renderOrders(); };
 window.cancelDelete = function() { pendingDelete = null; renderOrders(); };
-window.confirmDelete = function(backendId) {
-  dbOrders.child(backendId).remove().then(() => {
-      pendingDelete = null; showToast('Order deleted from Cloud');
-  });
+window.confirmDelete = async function(backendId) {
+  await dbOrders.child(backendId).remove();
+  pendingDelete = null; 
+  showToast('Order deleted from Cloud');
 };
 
 // --- FIREBASE EDIT LOGIC ---
@@ -282,7 +278,7 @@ window.updateEditTotal = function() {
   $('edit-total-display').textContent = '₹' + total.toFixed(2);
 };
 
-window.handleEditSubmit = function(event) {
+window.handleEditSubmit = async function(event) {
   if (event) event.preventDefault();
   if (!editingOrderId) return;
   const orderIndex = allOrders.findIndex(o => o.__backendId === editingOrderId);
@@ -314,15 +310,15 @@ window.handleEditSubmit = function(event) {
         updatedData.payment_status = `Split: Cash ₹${splitCash.toFixed(2)} | UPI ₹${splitUpi.toFixed(2)}`;
     } else updatedData.payment_status = editMode;
 
-    dbOrders.child(editingOrderId).update(updatedData).then(() => {
-        showToast('✅ Order updated in Cloud!'); toggleEditModal(false);
-        if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Save Changes'; }
-    });
+    await dbOrders.child(editingOrderId).update(updatedData);
+    showToast('✅ Order updated in Cloud!'); 
+    toggleEditModal(false);
 
   } catch (err) { 
       showToast('❌ ' + err.message, 'error'); 
+  } finally {
       if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Save Changes'; }
-  } 
+  }
 };
 
 // --- RENDER AND STATS FUNCTIONS ---
