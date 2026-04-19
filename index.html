@@ -254,7 +254,7 @@
     <div id="edit-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
      <div class="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 shadow-2xl" style="background:#181a24; border:1px solid #1e2030;"><button onclick="toggleEditModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl">✕</button>
       <h2 class="text-xl font-bold mb-6" style="color:#f0ece4; font-family:'Playfair Display',serif;">Edit Order</h2>
-      <form id="edit-order-form" onsubmit="handleEditSubmit(event)">
+      <form id="edit-order-form" onsubmit="handleEditSubmit(event)" novalidate>
        <div class="space-y-4 mb-6">
         <div><label class="block text-xs font-medium text-slate-400 mb-1">Order ID</label> <input type="text" id="edit-order-id" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200" disabled>
         </div>
@@ -296,7 +296,7 @@
     <div id="form-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
      <div class="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 shadow-2xl" style="background:#181a24; border:1px solid #1e2030;"><button onclick="toggleModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl">✕</button>
       <h2 class="text-xl font-bold mb-6" style="color:#f0ece4; font-family:'Playfair Display',serif;">Create New Order</h2>
-      <form id="new-premium-order-form" onsubmit="handlePremiumFormSubmit(event)">
+      <form id="new-premium-order-form" onsubmit="handlePremiumFormSubmit(event)" novalidate>
        <div id="restaurants-wrapper" class="space-y-6">
         <div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1">
          <div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label> <input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none transition-colors" placeholder="Enter restaurant name" required>
