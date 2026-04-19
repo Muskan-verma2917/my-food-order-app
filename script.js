@@ -1,99 +1,101 @@
-window.toggleModal = function(show) {
-  const modal = document.getElementById('form-modal');
-  if (show) {
-    modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-  } else {
-    modal.classList.add('hidden');
-    document.body.style.overflow = 'auto';
+// --- FIREBASE SETUP ---
+const firebaseConfig = {
+  apiKey: "AIzaSyAa7AB13P8HLuB5cRWHhOsRAHBowcMJsc4",
+  authDomain: "food-delivery-app-46de1.firebaseapp.com",
+  projectId: "food-delivery-app-46de1",
+  storageBucket: "food-delivery-app-46de1.firebasestorage.app",
+  messagingSenderId: "218219407862",
+  appId: "1:218219407862:web:df17a3059dfa3ece347fd7"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+const dbOrders = database.ref('orders');
+const dbCounter = database.ref('orderCounter');
+
+let allOrders = [];
+let currentFilter = 'All';
+let currentFilterDate = new Date().toISOString().slice(0, 10);
+let orderCounter = 0;
+let pendingDelete = null;
+
+const defaultConfig = { app_title: 'Daily Delivery Sales', background_color: '#0f1117' };
+const $ = id => document.getElementById(id);
+const today = new Date();
+$('date-filter').valueAsDate = today;
+
+// --- FIREBASE LIVE LISTENERS (Jadoo yahan hota hai) ---
+// Jab bhi kisi phone ya laptop par data add hoga, ye khud chal jayega!
+dbOrders.on('value', (snapshot) => {
+  const data = snapshot.val();
+  allOrders = [];
+  if (data) {
+    Object.keys(data).forEach(key => {
+      allOrders.push(data[key]);
+    });
   }
+  updateStats();
+  renderOrders();
+});
+
+dbCounter.on('value', (snapshot) => {
+  orderCounter = snapshot.val() || 0;
+});
+
+// --- UI FUNCTIONS ---
+window.toggleModal = function(show) {
+  const modal = $('form-modal');
+  if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; } 
+  else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; }
 };
 
 window.toggleEditModal = function(show) {
-  const modal = document.getElementById('edit-modal');
-  if (show) {
-    modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-  } else {
-    modal.classList.add('hidden');
-    document.body.style.overflow = 'auto';
-  }
+  const modal = $('edit-modal');
+  if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; } 
+  else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; }
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-  const modal = document.getElementById('form-modal');
-  modal.addEventListener('click', function(e) {
-    if (e.target === modal) toggleModal(false);
-  });
-  const editModal = document.getElementById('edit-modal');
-  editModal.addEventListener('click', function(e) {
-    if (e.target === editModal) toggleEditModal(false);
-  });
-  document.getElementById('edit-rate')?.addEventListener('input', updateEditTotal);
-  document.getElementById('edit-qty')?.addEventListener('input', updateEditTotal);
-  document.getElementById('edit-delivery')?.addEventListener('input', updateEditTotal);
+  $('form-modal').addEventListener('click', e => { if (e.target === $('form-modal')) toggleModal(false); });
+  $('edit-modal').addEventListener('click', e => { if (e.target === $('edit-modal')) toggleEditModal(false); });
+  $('edit-rate')?.addEventListener('input', updateEditTotal);
+  $('edit-qty')?.addEventListener('input', updateEditTotal);
+  $('edit-delivery')?.addEventListener('input', updateEditTotal);
 });
 
 let premRestCount = 1;
-
 window.toggleSplitFields = function() {
-  const mode = document.getElementById('p-payment').value;
-  const splitDiv = document.getElementById('split-inputs');
-  if (mode === 'Split') splitDiv.classList.remove('hidden');
-  else splitDiv.classList.add('hidden');
+  const mode = $('p-payment').value;
+  if (mode === 'Split') $('split-inputs').classList.remove('hidden'); else $('split-inputs').classList.add('hidden');
 };
 
 window.toggleEditSplitFields = function() {
-  const mode = document.getElementById('edit-payment-status').value;
-  const splitDiv = document.getElementById('edit-split-inputs');
-  if (mode === 'Split') splitDiv.classList.remove('hidden');
-  else splitDiv.classList.add('hidden');
+  const mode = $('edit-payment-status').value;
+  if (mode === 'Split') $('edit-split-inputs').classList.remove('hidden'); else $('edit-split-inputs').classList.add('hidden');
 };
 
 window.addPremiumItem = function(restId) {
   const container = document.getElementById(`items-rest-${restId}`);
   const div = document.createElement('div');
   div.className = 'item-row flex gap-2 items-start';
-  div.innerHTML = `
-    <div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name"></div>
-    <div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div>
-    <div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div>
-    <button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button>
-  `;
+  div.innerHTML = `<div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button>`;
   container.appendChild(div);
 };
 
-window.removePremiumItem = function(btn) {
-  btn.parentElement.remove();
-  calcPremiumTotal();
-};
+window.removePremiumItem = function(btn) { btn.parentElement.remove(); calcPremiumTotal(); };
 
 window.addPremiumRestaurant = function() {
   premRestCount++;
-  const wrapper = document.getElementById('restaurants-wrapper');
+  const wrapper = $('restaurants-wrapper');
   const div = document.createElement('div');
   div.className = 'rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f] relative mt-4';
   div.dataset.restId = premRestCount;
-  div.innerHTML = `
-    <button type="button" class="absolute top-3 right-3 text-slate-500 hover:text-red-500 text-xs font-bold uppercase tracking-wider" onclick="removePremiumRest(this)">Remove</button>
-    <div class="mb-4 pr-16"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name"></div>
-    <div class="items-container space-y-3 mb-3" id="items-rest-${premRestCount}">
-      <div class="item-row flex gap-2 items-start">
-        <div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name"></div>
-        <div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div>
-        <div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div>
-        <button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button>
-      </div>
-    </div>
-    <button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold hover:opacity-80" style="color: #ff5a36;">+ Add Item</button>
-  `;
+  div.innerHTML = `<button type="button" class="absolute top-3 right-3 text-slate-500 hover:text-red-500 text-xs font-bold uppercase tracking-wider" onclick="removePremiumRest(this)">Remove</button><div class="mb-4 pr-16"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name"></div><div class="items-container space-y-3 mb-3" id="items-rest-${premRestCount}"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold hover:opacity-80" style="color: #ff5a36;">+ Add Item</button>`;
   wrapper.appendChild(div);
 };
 
-window.removePremiumRest = function(btn) {
-  btn.parentElement.remove();
-  calcPremiumTotal();
-};
+window.removePremiumRest = function(btn) { btn.parentElement.remove(); calcPremiumTotal(); };
 
 window.calcPremiumTotal = function() {
   let total = 0;
@@ -102,111 +104,80 @@ window.calcPremiumTotal = function() {
     const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
     total += (rate * qty);
   });
-  const delCharge = parseFloat(document.getElementById('p-del-charge').value) || 0;
+  const delCharge = parseFloat($('p-del-charge').value) || 0;
   const grandTotal = total + delCharge;
-  
-  document.getElementById('p-subtotal').textContent = '₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  document.getElementById('p-delivery-display').textContent = '₹' + delCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  document.getElementById('p-grand-total').textContent = '₹' + grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  $('p-subtotal').textContent = '₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  $('p-delivery-display').textContent = '₹' + delCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  $('p-grand-total').textContent = '₹' + grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-// LOCAL STORAGE DATA FUNCTIONS
-function saveLocalData() {
-  try {
-    localStorage.setItem('dailyDeliveryApp_Data', JSON.stringify(allOrders));
-    localStorage.setItem('dailyDeliveryApp_Counter', orderCounter.toString());
-  } catch(e) {
-    showToast('Storage Error: Data safe nahi ho raha.', 'error');
-    console.error(e);
-  }
+function showToast(msg, type='success') {
+  const t = document.createElement('div');
+  t.className = 'toast rounded-lg px-4 py-2 text-sm font-medium shadow-lg z-[9999]';
+  t.style.cssText = type === 'error' ? 'background:#dc2626;color:#fff;' : 'background:#16a34a;color:#fff;';
+  t.textContent = msg;
+  const container = document.getElementById('toast-container');
+  if(container) { container.appendChild(t); setTimeout(() => t.remove(), 4000); } else { alert(msg); }
 }
 
-function loadLocalData() {
-  const savedData = localStorage.getItem('dailyDeliveryApp_Data');
-  const savedCounter = localStorage.getItem('dailyDeliveryApp_Counter');
-  if (savedData) allOrders = JSON.parse(savedData);
-  else allOrders = [];
-  if (savedCounter) orderCounter = parseInt(savedCounter);
-  else orderCounter = 0;
-  updateStats();
-  renderOrders();
-}
+function filterByDate() { currentFilterDate = $('date-filter').value; renderOrders(); updateStats(); }
 
+// --- FIREBASE SUBMIT LOGIC ---
 window.handlePremiumFormSubmit = function(event) {
   if (event) event.preventDefault();
-  
-  const btn = document.getElementById('place-order-btn');
-  if(btn) {
-    btn.disabled = true;
-    btn.style.opacity = '0.5';
-    btn.textContent = 'Saving...';
-  }
+  const btn = $('place-order-btn');
+  if(btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.textContent = 'Saving to Cloud...'; }
 
   try {
     const restBlocks = document.querySelectorAll('.rest-block');
     let allItems = [];
-    let itemsTotal = 0;
-
     restBlocks.forEach(block => {
-      const restNameInput = block.querySelector('.rest-name');
-      const restName = restNameInput ? restNameInput.value.trim() : '';
+      const restName = block.querySelector('.rest-name') ? block.querySelector('.rest-name').value.trim() : '';
       if (restName) {
-        const itemRows = block.querySelectorAll('.item-row');
-        itemRows.forEach(row => {
-          const nameInput = row.querySelector('.item-name');
-          const rateInput = row.querySelector('.item-rate');
-          const qtyInput = row.querySelector('.item-qty');
-          const name = nameInput ? nameInput.value.trim() : '';
-          const rate = rateInput ? parseFloat(rateInput.value) || 0 : 0;
-          const qty = qtyInput ? parseFloat(qtyInput.value) || 1 : 1;
-          if (name && rate > 0) {
-            const total = rate * qty;
-            itemsTotal += total;
-            allItems.push({ name, rate, qty, total, restaurant: restName });
-          }
+        block.querySelectorAll('.item-row').forEach(row => {
+          const name = row.querySelector('.item-name') ? row.querySelector('.item-name').value.trim() : '';
+          const rate = row.querySelector('.item-rate') ? parseFloat(row.querySelector('.item-rate').value) || 0 : 0;
+          const qty = row.querySelector('.item-qty') ? parseFloat(row.querySelector('.item-qty').value) || 1 : 1;
+          if (name && rate > 0) allItems.push({ name, rate, qty, total: rate * qty, restaurant: restName });
         });
       }
     });
 
     if (allItems.length === 0) throw new Error("Please add at least one item with name and rate!");
 
-    const paymentMode = document.getElementById('p-payment').value;
-    const contact = document.getElementById('p-contact').value.trim();
-    const address = document.getElementById('p-address').value.trim();
-    const rider = document.getElementById('p-rider').value.trim();
-    const deliveryCharge = parseFloat(document.getElementById('p-del-charge').value) || 0;
+    const paymentMode = $('p-payment').value;
+    const contact = $('p-contact').value.trim();
+    const address = $('p-address').value.trim();
+    const rider = $('p-rider').value.trim();
+    const deliveryCharge = parseFloat($('p-del-charge').value) || 0;
 
     if (!paymentMode) throw new Error("Select a Payment Mode!");
     if (!address) throw new Error("Delivery Address is required!");
 
-    let splitCash = null;
-    let splitUpi = null;
     let finalPaymentMode = paymentMode;
-
     if (paymentMode === 'Split') {
-      splitCash = parseFloat(document.getElementById('split-cash').value) || 0;
-      splitUpi = parseFloat(document.getElementById('split-upi').value) || 0;
+      let splitCash = (parseFloat($('split-cash').value) || 0) + deliveryCharge;
+      let splitUpi = parseFloat($('split-upi').value) || 0;
       if (splitCash <= 0 && splitUpi <= 0) throw new Error("Enter at least one amount for Split payment!");
-      splitCash += deliveryCharge;
       finalPaymentMode = `Split: Cash ₹${splitCash.toFixed(2)} | UPI ₹${splitUpi.toFixed(2)}`;
     }
 
-    const dateInput = document.getElementById('date-filter');
-    const orderDate = dateInput && dateInput.value ? dateInput.value : new Date().toISOString().split('T')[0];
+    const orderDate = $('date-filter') && $('date-filter').value ? $('date-filter').value : new Date().toISOString().split('T')[0];
 
-    let isFirstItem = true;
+    // Increase counter in Firebase
     orderCounter++;
+    dbCounter.set(orderCounter);
     const currentOrderId = String(orderCounter).padStart(3, '0');
     
+    let isFirstItem = true;
     for (const item of allItems) {
       let status = "Payment Pending";
-      if (paymentMode === "UPI Done" || paymentMode === "Cash" || paymentMode === "Split") {
-        status = "Delivered";
-      }
-      const appliedDeliveryCharge = isFirstItem ? deliveryCharge : 0;
+      if (paymentMode === "UPI Done" || paymentMode === "Cash" || paymentMode === "Split") status = "Delivered";
+      
+      const newOrderRef = dbOrders.push(); // Create a new unique ID in Firebase
       
       const newOrder = {
-        __backendId: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+        __backendId: newOrderRef.key, // Save key inside object for easy edit
         order_id: currentOrderId,
         customer_name: item.restaurant,
         item_name: item.name,
@@ -221,89 +192,144 @@ window.handlePremiumFormSubmit = function(event) {
         payment_status: finalPaymentMode,
         contact: contact,
         rider: rider,
-        delivery_charge: appliedDeliveryCharge
+        delivery_charge: isFirstItem ? deliveryCharge : 0
       };
-      allOrders.push(newOrder);
+      
+      newOrderRef.set(newOrder); // Save to cloud
       isFirstItem = false;
     }
 
-    saveLocalData();
-
-    if(btn) {
-      btn.disabled = false;
-      btn.style.opacity = '1';
-      btn.textContent = 'Place Order';
-    }
-
-    showToast(`✅ Perfect! ${allItems.length} item(s) saved successfully!`);
-    document.getElementById('new-premium-order-form').reset();
-    document.getElementById('p-grand-total').textContent = '₹0';
-    document.getElementById('p-subtotal').textContent = '₹0';
-    document.getElementById('p-delivery-display').textContent = '₹0';
-    document.getElementById('split-inputs').classList.add('hidden');
+    if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Place Order'; }
+    showToast(`✅ Cloud Sync Success! ${allItems.length} item(s) saved!`);
     
-    const wrapper = document.getElementById('restaurants-wrapper');
-    wrapper.innerHTML = `
-      <div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1">
-        <div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name"></div>
-        <div class="items-container space-y-3 mb-3" id="items-rest-1">
-          <div class="item-row flex gap-2 items-start">
-            <div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name"></div>
-            <div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div>
-            <div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div>
-            <button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button>
-          </div>
-        </div>
-        <button type="button" onclick="addPremiumItem(1)" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button>
-      </div>
-    `;
+    // Reset Form
+    $('new-premium-order-form').reset(); $('p-grand-total').textContent = '₹0'; $('p-subtotal').textContent = '₹0'; $('p-delivery-display').textContent = '₹0'; $('split-inputs').classList.add('hidden');
+    $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(1)" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button></div>`;
     premRestCount = 1;
-    renderOrders();
-    updateStats();
     setTimeout(() => toggleModal(false), 500);
 
   } catch (err) {
-    console.error(err);
-    showToast('❌ ' + err.message, 'error');
-    if(btn) {
-      btn.disabled = false;
-      btn.style.opacity = '1';
-      btn.textContent = 'Place Order';
-    }
+    console.error(err); showToast('❌ ' + err.message, 'error');
+    if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Place Order'; }
   }
 };
 
-let allOrders = [];
-let currentFilter = 'All';
-let currentFilterDate = new Date().toISOString().slice(0, 10);
-let orderCounter = 0;
-let pendingDelete = null;
 
-const defaultConfig = { app_title: 'Daily Delivery Sales', background_color: '#0f1117' };
+// --- FIREBASE STATUS & DELETE LOGIC ---
+window.changeStatus = function(backendId, newPaymentStatus) {
+  const orderIndex = allOrders.findIndex(o => o.__backendId === backendId);
+  if (orderIndex === -1) return;
+  
+  let order = allOrders[orderIndex];
+  let oldStatus = order.payment_status;
 
-const $ = id => document.getElementById(id);
-const today = new Date();
-$('date-filter').valueAsDate = today;
-
-function showToast(msg, type='success') {
-  const t = document.createElement('div');
-  t.className = 'toast rounded-lg px-4 py-2 text-sm font-medium shadow-lg z-[9999]';
-  t.style.cssText = type === 'error' ? 'background:#dc2626;color:#fff;' : 'background:#16a34a;color:#fff;';
-  t.textContent = msg;
-  const container = document.getElementById('toast-container');
-  if(container) {
-    container.appendChild(t);
-    setTimeout(() => t.remove(), 4000);
-  } else {
-    alert(msg);
+  // SAFETY LOCK: UPI amount protection
+  if (newPaymentStatus === 'Cash' && (oldStatus === 'UPI Done' || oldStatus.includes('Split'))) {
+      dbOrders.child(backendId).update({ status: 'Delivered' }).then(() => {
+         showToast('✅ UPI Amount Protected! (Status Delivered)'); 
+      });
+      return; 
   }
-}
+  
+  let newStatus = order.status;
+  if (newPaymentStatus === 'UPI Done' || newPaymentStatus === 'Cash') newStatus = 'Delivered';
+  else if (newPaymentStatus === 'Payment Pending') newStatus = 'Payment Pending';
+  
+  dbOrders.child(backendId).update({
+      payment_status: newPaymentStatus,
+      status: newStatus
+  }).then(() => {
+      showToast('Cloud Status updated'); 
+  });
+};
 
-function filterByDate() {
-  currentFilterDate = $('date-filter').value;
-  renderOrders();
-  updateStats();
-}
+window.requestDelete = function(backendId) { pendingDelete = backendId; renderOrders(); };
+window.cancelDelete = function() { pendingDelete = null; renderOrders(); };
+window.confirmDelete = function(backendId) {
+  dbOrders.child(backendId).remove().then(() => {
+      pendingDelete = null; showToast('Order deleted from Cloud');
+  });
+};
+
+// --- FIREBASE EDIT LOGIC ---
+let editingOrderId = null;
+window.openEditModal = function(backendId) {
+  editingOrderId = backendId;
+  const order = allOrders.find(o => o.__backendId === backendId);
+  if (!order) return;
+  $('edit-restaurant').value = order.customer_name || ''; $('edit-item-name').value = order.item_name || ''; $('edit-rate').value = order.unit_price || ''; $('edit-qty').value = order.quantity || ''; $('edit-delivery').value = order.delivery_charge || ''; $('edit-rider').value = order.rider || ''; $('edit-contact').value = order.contact || ''; $('edit-address').value = order.address || order.customer_address || '';
+  let pStatus = order.payment_status || '';
+  if (pStatus.includes('Split')) {
+      $('edit-payment-status').value = 'Split';
+      let savedCash = pStatus.match(/Cash ₹([\d.]+)/) ? parseFloat(pStatus.match(/Cash ₹([\d.]+)/)[1]) : 0;
+      let savedUpi = pStatus.match(/UPI ₹([\d.]+)/) ? parseFloat(pStatus.match(/UPI ₹([\d.]+)/)[1]) : 0;
+      let delCharge = parseFloat(order.delivery_charge) || 0;
+      $('edit-split-cash').value = Math.max(0, savedCash - delCharge); $('edit-split-upi').value = savedUpi; $('edit-split-inputs').classList.remove('hidden');
+  } else { $('edit-payment-status').value = pStatus; $('edit-split-inputs').classList.add('hidden'); }
+  updateEditTotal(); toggleEditModal(true);
+};
+
+window.updateEditTotal = function() {
+  const total = (parseFloat($('edit-rate').value) || 0) * (parseFloat($('edit-qty').value) || 1) + (parseFloat($('edit-delivery').value) || 0);
+  $('edit-total-display').textContent = '₹' + total.toFixed(2);
+};
+
+window.handleEditSubmit = function(event) {
+  if (event) event.preventDefault();
+  if (!editingOrderId) return;
+  const orderIndex = allOrders.findIndex(o => o.__backendId === editingOrderId);
+  if (orderIndex === -1) return;
+  
+  const btn = $('edit-save-btn');
+  if(btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.textContent = 'Saving...'; }
+  
+  try {
+    let order = allOrders[orderIndex];
+    let updatedData = {
+      customer_name: $('edit-restaurant').value.trim(),
+      item_name: $('edit-item-name').value.trim(),
+      unit_price: parseFloat($('edit-rate').value) || 0,
+      quantity: parseFloat($('edit-qty').value) || 1,
+      delivery_charge: parseFloat($('edit-delivery').value) || 0,
+      rider: $('edit-rider').value.trim(),
+      contact: $('edit-contact').value.trim(),
+      address: $('edit-address').value.trim()
+    };
+    updatedData.total = updatedData.unit_price * updatedData.quantity;
+    updatedData.customer_address = updatedData.address;
+    updatedData.location = updatedData.address;
+    
+    let editMode = $('edit-payment-status').value;
+    if (editMode === 'Split') {
+        let splitCash = (parseFloat($('edit-split-cash').value) || 0) + updatedData.delivery_charge;
+        let splitUpi = parseFloat($('edit-split-upi').value) || 0;
+        updatedData.payment_status = `Split: Cash ₹${splitCash.toFixed(2)} | UPI ₹${splitUpi.toFixed(2)}`;
+    } else updatedData.payment_status = editMode;
+
+    // Send update to Cloud
+    dbOrders.child(editingOrderId).update(updatedData).then(() => {
+        showToast('✅ Order updated in Cloud!'); toggleEditModal(false);
+        if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Save Changes'; }
+    });
+
+  } catch (err) { 
+      showToast('❌ ' + err.message, 'error'); 
+      if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Save Changes'; }
+  } 
+};
+
+// --- RENDER AND STATS FUNCTIONS (Keep exactly same for UI) ---
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentFilter = btn.dataset.filter;
+    document.querySelectorAll('.filter-btn').forEach(b => { b.style.background = '#2a2d3e'; b.style.color = '#6b7084'; });
+    btn.style.background = defaultConfig.primary_action_color; btn.style.color = '#fff'; renderOrders();
+  });
+});
+
+$('app-title').textContent = defaultConfig.app_title;
+$('app').style.background = defaultConfig.background_color;
+if (typeof lucide !== 'undefined') lucide.createIcons();
 
 function updateStats() {
   const filteredByDate = allOrders.filter(o => o.date && o.date.slice(0, 10) === currentFilterDate);
@@ -337,22 +363,18 @@ function updateStats() {
     }
   });
 
-  if ($('breakdown-upi')) $('breakdown-upi').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if ($('breakdown-cash')) $('breakdown-cash').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if ($('breakdown-pending')) $('breakdown-pending').textContent = '₹' + pendingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
+  if ($('breakdown-upi')) $('breakdown-upi').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  if ($('breakdown-cash')) $('breakdown-cash').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  if ($('breakdown-pending')) $('breakdown-pending').textContent = '₹' + pendingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   if ($('upi-items-total')) $('upi-items-total').textContent = '₹' + upiItemsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   if ($('upi-delivery-total')) $('upi-delivery-total').textContent = '₹' + upiDeliveryTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   if ($('upi-grand-total')) $('upi-grand-total').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-
   if ($('cash-items-total')) $('cash-items-total').textContent = '₹' + cashItemsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   if ($('cash-delivery-total')) $('cash-delivery-total').textContent = '₹' + cashDeliveryTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   if ($('cash-grand-total')) $('cash-grand-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-
   if ($('pending-items-total')) $('pending-items-total').textContent = '₹' + pendingItemsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   if ($('pending-delivery-total')) $('pending-delivery-total').textContent = '₹' + pendingDeliveryTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   if ($('pending-grand-total')) $('pending-grand-total').textContent = '₹' + pendingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-
   if ($('stat-sales-inr')) $('stat-sales-inr').textContent = '₹' + pureSales.toFixed(2);
   if ($('stat-sales-delivery')) $('stat-sales-delivery').textContent = '₹' + totalWithDelivery.toFixed(2);
 
@@ -361,10 +383,8 @@ function updateStats() {
   
   const deliveredOrders = filteredByDate.filter(o => o.status === 'Delivered');
   deliveredOrders.forEach(o => deliveredSales += ((parseFloat(o.total)||0) + (parseFloat(o.delivery_charge)||0)));
-  
   const pendingOrders = filteredByDate.filter(o => o.payment_status === 'Payment Pending');
   pendingOrders.forEach(o => pendingSales += ((parseFloat(o.total)||0) + (parseFloat(o.delivery_charge)||0)));
-  
   const upiOrders = filteredByDate.filter(o => o.payment_status === 'UPI Done');
   upiOrders.forEach(o => upiSales += ((parseFloat(o.total)||0) + (parseFloat(o.delivery_charge)||0)));
 
@@ -486,95 +506,3 @@ function createRow(order) {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
-
-window.changeStatus = function(backendId, newPaymentStatus) {
-  const orderIndex = allOrders.findIndex(o => o.__backendId === backendId);
-  if (orderIndex === -1) return;
-  
-  let order = allOrders[orderIndex];
-  let oldStatus = order.payment_status;
-
-  // SAFETY LOCK: Agar already UPI ya Split tha, aur user galti se 'Cash' ("Delivered (Cash)") daba de,
-  // toh hum UPI ka paisa kam nahi hone denge!
-  if (newPaymentStatus === 'Cash' && (oldStatus === 'UPI Done' || oldStatus.includes('Split'))) {
-      order.status = 'Delivered';
-      saveLocalData(); 
-      showToast('✅ UPI Amount Protected! (Status Delivered)'); 
-      updateStats(); 
-      renderOrders();
-      return; // Yahan se aage code nahi jayega, taaki paisa na kate
-  }
-  
-  order.payment_status = newPaymentStatus;
-  if (newPaymentStatus === 'UPI Done' || newPaymentStatus === 'Cash') order.status = 'Delivered';
-  else if (newPaymentStatus === 'Payment Pending') order.status = 'Payment Pending';
-  
-  saveLocalData(); 
-  showToast('Status updated'); 
-  updateStats(); 
-  renderOrders();
-};
-
-window.requestDelete = function(backendId) { pendingDelete = backendId; renderOrders(); };
-window.cancelDelete = function() { pendingDelete = null; renderOrders(); };
-window.confirmDelete = function(backendId) {
-  const orderIndex = allOrders.findIndex(o => o.__backendId === backendId);
-  if (orderIndex !== -1) { allOrders.splice(orderIndex, 1); saveLocalData(); }
-  pendingDelete = null; showToast('Order deleted'); updateStats(); renderOrders();
-};
-
-let editingOrderId = null;
-window.openEditModal = function(backendId) {
-  editingOrderId = backendId;
-  const order = allOrders.find(o => o.__backendId === backendId);
-  if (!order) return;
-  $('edit-restaurant').value = order.customer_name || ''; $('edit-item-name').value = order.item_name || ''; $('edit-rate').value = order.unit_price || ''; $('edit-qty').value = order.quantity || ''; $('edit-delivery').value = order.delivery_charge || ''; $('edit-rider').value = order.rider || ''; $('edit-contact').value = order.contact || ''; $('edit-address').value = order.address || order.customer_address || '';
-  let pStatus = order.payment_status || '';
-  if (pStatus.includes('Split')) {
-      $('edit-payment-status').value = 'Split';
-      let savedCash = pStatus.match(/Cash ₹([\d.]+)/) ? parseFloat(pStatus.match(/Cash ₹([\d.]+)/)[1]) : 0;
-      let savedUpi = pStatus.match(/UPI ₹([\d.]+)/) ? parseFloat(pStatus.match(/UPI ₹([\d.]+)/)[1]) : 0;
-      let delCharge = parseFloat(order.delivery_charge) || 0;
-      $('edit-split-cash').value = Math.max(0, savedCash - delCharge); $('edit-split-upi').value = savedUpi; $('edit-split-inputs').classList.remove('hidden');
-  } else { $('edit-payment-status').value = pStatus; $('edit-split-inputs').classList.add('hidden'); }
-  updateEditTotal(); toggleEditModal(true);
-};
-
-window.updateEditTotal = function() {
-  const total = (parseFloat($('edit-rate').value) || 0) * (parseFloat($('edit-qty').value) || 1) + (parseFloat($('edit-delivery').value) || 0);
-  $('edit-total-display').textContent = '₹' + total.toFixed(2);
-};
-
-window.handleEditSubmit = function(event) {
-  if (event) event.preventDefault();
-  if (!editingOrderId) return;
-  const orderIndex = allOrders.findIndex(o => o.__backendId === editingOrderId);
-  if (orderIndex === -1) return;
-  const btn = $('edit-save-btn');
-  if(btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.textContent = 'Saving...'; }
-  try {
-    let order = allOrders[orderIndex];
-    order.customer_name = $('edit-restaurant').value.trim(); order.item_name = $('edit-item-name').value.trim(); order.unit_price = parseFloat($('edit-rate').value) || 0; order.quantity = parseFloat($('edit-qty').value) || 1; order.total = order.unit_price * order.quantity; order.delivery_charge = parseFloat($('edit-delivery').value) || 0; order.rider = $('edit-rider').value.trim(); order.contact = $('edit-contact').value.trim(); order.address = $('edit-address').value.trim(); order.customer_address = order.address; order.location = order.address;
-    let editMode = $('edit-payment-status').value;
-    if (editMode === 'Split') {
-        let splitCash = (parseFloat($('edit-split-cash').value) || 0) + order.delivery_charge;
-        let splitUpi = parseFloat($('edit-split-upi').value) || 0;
-        order.payment_status = `Split: Cash ₹${splitCash.toFixed(2)} | UPI ₹${splitUpi.toFixed(2)}`;
-    } else order.payment_status = editMode;
-    saveLocalData(); showToast('✅ Order updated successfully!'); renderOrders(); updateStats(); toggleEditModal(false);
-  } catch (err) { showToast('❌ ' + err.message, 'error'); } 
-  finally { if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Save Changes'; } }
-};
-
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    currentFilter = btn.dataset.filter;
-    document.querySelectorAll('.filter-btn').forEach(b => { b.style.background = '#2a2d3e'; b.style.color = '#6b7084'; });
-    btn.style.background = defaultConfig.primary_action_color; btn.style.color = '#fff'; renderOrders();
-  });
-});
-
-$('app-title').textContent = defaultConfig.app_title;
-$('app').style.background = defaultConfig.background_color;
-loadLocalData();
-if (typeof lucide !== 'undefined') lucide.createIcons();
