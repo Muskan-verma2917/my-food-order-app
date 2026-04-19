@@ -140,7 +140,7 @@ function loadLocalData() {
 
 window.handlePremiumFormSubmit = function(event) {
   event.preventDefault();
-  const btn = event.submitter || document.querySelector('#new-premium-order-form button[type="submit"]');
+  const btn = document.getElementById('place-order-btn');
   btn.disabled = true;
   btn.style.opacity = '0.5';
   btn.textContent = 'Saving...';
@@ -774,7 +774,7 @@ window.handleEditSubmit = function(event) {
   const orderIndex = allOrders.findIndex(o => o.__backendId === editingOrderId);
   if (orderIndex === -1) return;
 
-  const btn = event.submitter || document.querySelector('#edit-order-form button[type="submit"]');
+const btn = document.getElementById('edit-save-btn');
   btn.disabled = true;
   btn.style.opacity = '0.5';
   btn.textContent = 'Saving...';

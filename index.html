@@ -254,7 +254,7 @@
     <div id="edit-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
      <div class="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 shadow-2xl" style="background:#181a24; border:1px solid #1e2030;"><button onclick="toggleEditModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl">✕</button>
       <h2 class="text-xl font-bold mb-6" style="color:#f0ece4; font-family:'Playfair Display',serif;">Edit Order</h2>
-      <form id="edit-order-form" onsubmit="handleEditSubmit(event)" novalidate>
+      <form id="edit-order-form" onsubmit="handleEditSubmit(event)">
        <div class="space-y-4 mb-6">
         <div><label class="block text-xs font-medium text-slate-400 mb-1">Order ID</label> <input type="text" id="edit-order-id" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200" disabled>
         </div>
@@ -287,7 +287,7 @@
        </div>
        <div class="flex items-center justify-between bg-[#16181f] p-4 rounded-lg border border-slate-700 mb-6"><span class="text-slate-400 font-medium">Total Sale:</span> <span id="edit-total-display" class="text-2xl font-bold" style="color:#4ade80;">₹0</span>
        </div>
-       <div class="flex gap-3"><button type="submit" class="flex-1 py-3 rounded-lg font-bold text-white transition-opacity hover:opacity-90 shadow-lg" style="background-color:#ff5a36;">Save Changes</button> <button type="button" onclick="toggleEditModal(false)" class="flex-1 py-3 rounded-lg font-bold transition-colors" style="background-color:#2a2d3e; color:#6b7084;">Cancel</button>
+       <div class="flex gap-3"><button type="button" id="edit-save-btn" onclick="handleEditSubmit(event)" class="flex-1 py-3 rounded-lg font-bold text-white transition-opacity hover:opacity-90 shadow-lg" style="background-color:#ff5a36;">Save Changes</button> <button type="button" onclick="toggleEditModal(false)" class="flex-1 py-3 rounded-lg font-bold transition-colors" style="background-color:#2a2d3e; color:#6b7084;">Cancel</button>
        </div>
       </form>
      </div>
@@ -339,7 +339,7 @@
         </div>
         <div class="border-t border-slate-600 pt-2 flex items-center justify-between"><span class="text-slate-300 font-bold">Order Total:</span> <span id="p-grand-total" class="text-2xl font-bold" style="color: #ff5a36;">₹0</span>
         </div>
-       </div><button type="submit" class="w-full py-3.5 rounded-lg font-bold text-white transition-opacity hover:opacity-90 shadow-lg" style="background-color: #ff5a36; box-shadow: 0 4px 14px rgba(255, 90, 54, 0.2);">Place Order</button>
+       </div><button type="button" id="place-order-btn" onclick="handlePremiumFormSubmit(event)" class="w-full py-3.5 rounded-lg font-bold text-white transition-opacity hover:opacity-90 shadow-lg" style="background-color: #ff5a36; box-shadow: 0 4px 14px rgba(255, 90, 54, 0.2);">Place Order</button>
       </form>
      </div>
     </div>
