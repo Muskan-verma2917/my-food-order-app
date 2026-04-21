@@ -28,7 +28,7 @@ let currentFilterDate = getLocalIsoDate();
 let orderCounter = 0;
 let pendingDelete = null;
 
-const defaultConfig = { app_title: 'Daily Delivery Sales', background_color: '#0f1117' };
+const defaultConfig = { app_title: 'Daily Delivery Sales', background_color: '#0f1117', primary_action_color: '#e85d3a' };
 const $ = id => document.getElementById(id);
 
 if ($('date-filter')) {
@@ -66,8 +66,8 @@ window.toggleEditModal = function(show) {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-  $('form-modal').addEventListener('click', e => { if (e.target === $('form-modal')) toggleModal(false); });
-  $('edit-modal').addEventListener('click', e => { if (e.target === $('edit-modal')) toggleEditModal(false); });
+  $('form-modal')?.addEventListener('click', e => { if (e.target === $('form-modal')) toggleModal(false); });
+  $('edit-modal')?.addEventListener('click', e => { if (e.target === $('edit-modal')) toggleEditModal(false); });
   $('edit-rate')?.addEventListener('input', updateEditTotal);
   $('edit-qty')?.addEventListener('input', updateEditTotal);
   $('edit-delivery')?.addEventListener('input', updateEditTotal);
@@ -209,7 +209,6 @@ window.handlePremiumFormSubmit = async function(event) {
     if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Place Order'; }
     showToast(`✅ Cloud Sync Success! ${allItems.length} item(s) saved!`);
     
-    // Reset Form
     $('new-premium-order-form').reset(); $('p-grand-total').textContent = '₹0'; $('p-subtotal').textContent = '₹0'; $('p-delivery-display').textContent = '₹0'; $('split-inputs').classList.add('hidden');
     $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(1)" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button></div>`;
     premRestCount = 1;
@@ -352,7 +351,6 @@ function updateStats() {
     }
   });
 
-  // Calculate Specific Counts for the New Boxes
   const deliveredCashOrders = filteredByDate.filter(o => o.payment_status === 'Cash' || (o.payment_status || '').includes('Split'));
   const deliveredUpiOrders = filteredByDate.filter(o => o.payment_status === 'UPI Done' || (o.payment_status || '').includes('Split'));
   const allDeliveredOrders = filteredByDate.filter(o => o.status === 'Delivered');
@@ -361,19 +359,15 @@ function updateStats() {
   if ($('stat-sales-inr')) $('stat-sales-inr').textContent = '₹' + pureSales.toFixed(2);
   if ($('stat-sales-delivery')) $('stat-sales-delivery').textContent = '₹' + totalWithDelivery.toFixed(2);
 
-  // New Delivered (Cash) Box updates
   if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = deliveredCashOrders.length;
   if ($('stat-delivered-cash-total')) $('stat-delivered-cash-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
-  // Renamed Delivered (UPI) Box updates
   if ($('stat-delivered-upi')) $('stat-delivered-upi').textContent = deliveredUpiOrders.length;
   if ($('stat-delivered-upi-total')) $('stat-delivered-upi-total').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
-  // Total Delivered updates
   if ($('stat-delivered')) $('stat-delivered').textContent = allDeliveredOrders.length;
   if ($('stat-delivered-total')) $('stat-delivered-total').textContent = '₹' + (cashTotal + upiTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
-  // Payment Pending updates
   if ($('stat-payment-pending')) $('stat-payment-pending').textContent = pendingOrders.length;
   if ($('stat-payment-pending-total')) $('stat-payment-pending-total').textContent = '₹' + pendingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
@@ -489,3 +483,17 @@ function createRow(order) {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+// --- FILTER BUTTONS EVENT LISTENER ---
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentFilter = btn.dataset.filter;
+    document.querySelectorAll('.filter-btn').forEach(b => { 
+      b.style.background = '#2a2d3e'; 
+      b.style.color = '#6b7084'; 
+    });
+    btn.style.background = defaultConfig.primary_action_color; 
+    btn.style.color = '#fff'; 
+    renderOrders();
+  });
+});
