@@ -2,7 +2,7 @@
 const firebaseConfig = {
   apiKey: "AIzaSyAa7AB13P8HLuB5cRWHhOsRAHBowcMJsc4",
   authDomain: "food-delivery-app-46de1.firebaseapp.com",
-  databaseURL: "https://food-delivery-app-46de1-default-rtdb.asia-southeast1.firebasedatabase.app", // <--- YAHAN LINK PASTE KAREIN
+  databaseURL: "https://food-delivery-app-46de1-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "food-delivery-app-46de1",
   storageBucket: "food-delivery-app-46de1.firebasestorage.app",
   messagingSenderId: "218219407862",
@@ -131,7 +131,7 @@ function showToast(msg, type='success') {
 
 function filterByDate() { currentFilterDate = $('date-filter').value; renderOrders(); updateStats(); }
 
-// --- FIREBASE SUBMIT LOGIC (ASYNC ADDED) ---
+// --- FIREBASE SUBMIT LOGIC ---
 window.handlePremiumFormSubmit = async function(event) {
   if (event) event.preventDefault();
   const btn = $('place-order-btn');
@@ -202,7 +202,7 @@ window.handlePremiumFormSubmit = async function(event) {
         delivery_charge: isFirstItem ? deliveryCharge : 0
       };
       
-      await newOrderRef.set(newOrder); // DATA EXACTLY CLOUD MEIN SAVE HOGA YAHAN
+      await newOrderRef.set(newOrder); 
       isFirstItem = false;
     }
 
@@ -217,7 +217,7 @@ window.handlePremiumFormSubmit = async function(event) {
 
   } catch (err) {
     console.error(err); 
-    showToast('❌ Cloud Error: ' + err.message, 'error'); // AGAR ERROR AAYA TO AB LAL RANG MEIN DIKHEGA
+    showToast('❌ Cloud Error: ' + err.message, 'error'); 
     if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Place Order'; }
   }
 };
@@ -322,14 +322,6 @@ window.handleEditSubmit = async function(event) {
 };
 
 // --- RENDER AND STATS FUNCTIONS ---
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    currentFilter = btn.dataset.filter;
-    document.querySelectorAll('.filter-btn').forEach(b => { b.style.background = '#2a2d3e'; b.style.color = '#6b7084'; });
-    btn.style.background = defaultConfig.primary_action_color; btn.style.color = '#fff'; renderOrders();
-  });
-});
-
 $('app-title').textContent = defaultConfig.app_title;
 $('app').style.background = defaultConfig.background_color;
 if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -337,7 +329,6 @@ if (typeof lucide !== 'undefined') lucide.createIcons();
 function updateStats() {
   const filteredByDate = allOrders.filter(o => o.date && o.date.slice(0, 10) === currentFilterDate);
   let upiTotal = 0, cashTotal = 0, pendingTotal = 0, pureSales = 0, totalWithDelivery = 0;
-  let upiItemsTotal = 0, upiDeliveryTotal = 0, cashItemsTotal = 0, cashDeliveryTotal = 0, pendingItemsTotal = 0, pendingDeliveryTotal = 0, deliveredItemsTotal = 0, deliveredDeliveryTotal = 0, deliveredTotal = 0;
 
   filteredByDate.forEach(o => {
     if (o.status === 'Cancelled') return;
@@ -349,58 +340,46 @@ function updateStats() {
     pureSales += itemTotal;
     totalWithDelivery += orderTotalWithDel;
 
-    if (o.status === 'Delivered') { deliveredTotal += orderTotalWithDel; deliveredItemsTotal += itemTotal; deliveredDeliveryTotal += delCharge; }
-    if (status === 'UPI Done') { upiTotal += orderTotalWithDel; upiItemsTotal += itemTotal; upiDeliveryTotal += delCharge; }
-    else if (status === 'Cash') { cashTotal += orderTotalWithDel; cashItemsTotal += itemTotal; cashDeliveryTotal += delCharge; }
-    else if (status === 'Payment Pending') { pendingTotal += orderTotalWithDel; pendingItemsTotal += itemTotal; pendingDeliveryTotal += delCharge; }
+    if (status === 'UPI Done') { upiTotal += orderTotalWithDel; }
+    else if (status === 'Cash') { cashTotal += orderTotalWithDel; }
+    else if (status === 'Payment Pending') { pendingTotal += orderTotalWithDel; }
     else if (status.includes('Split')) {
       const cashMatch = status.match(/Cash ₹([\d.]+)/);
       const upiMatch = status.match(/UPI ₹([\d.]+)/);
       let splitCash = cashMatch ? parseFloat(cashMatch[1]) : 0;
       let splitUpi = upiMatch ? parseFloat(upiMatch[1]) : 0;
       cashTotal += splitCash; upiTotal += splitUpi;
-      let cashDelCharge = Math.min(splitCash, delCharge);
-      let upiDelCharge = delCharge - cashDelCharge;
-      cashDeliveryTotal += cashDelCharge; cashItemsTotal += (splitCash - cashDelCharge);
-      upiDeliveryTotal += upiDelCharge; upiItemsTotal += (splitUpi - upiDelCharge);
     }
   });
 
-  if ($('breakdown-upi')) $('breakdown-upi').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('breakdown-cash')) $('breakdown-cash').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('breakdown-pending')) $('breakdown-pending').textContent = '₹' + pendingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('upi-items-total')) $('upi-items-total').textContent = '₹' + upiItemsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('upi-delivery-total')) $('upi-delivery-total').textContent = '₹' + upiDeliveryTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('upi-grand-total')) $('upi-grand-total').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('cash-items-total')) $('cash-items-total').textContent = '₹' + cashItemsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('cash-delivery-total')) $('cash-delivery-total').textContent = '₹' + cashDeliveryTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('cash-grand-total')) $('cash-grand-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('pending-items-total')) $('pending-items-total').textContent = '₹' + pendingItemsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('pending-delivery-total')) $('pending-delivery-total').textContent = '₹' + pendingDeliveryTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('pending-grand-total')) $('pending-grand-total').textContent = '₹' + pendingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  // Calculate Specific Counts for the New Boxes
+  const deliveredCashOrders = filteredByDate.filter(o => o.payment_status === 'Cash' || (o.payment_status || '').includes('Split'));
+  const deliveredUpiOrders = filteredByDate.filter(o => o.payment_status === 'UPI Done' || (o.payment_status || '').includes('Split'));
+  const allDeliveredOrders = filteredByDate.filter(o => o.status === 'Delivered');
+  const pendingOrders = filteredByDate.filter(o => o.payment_status === 'Payment Pending');
+
   if ($('stat-sales-inr')) $('stat-sales-inr').textContent = '₹' + pureSales.toFixed(2);
   if ($('stat-sales-delivery')) $('stat-sales-delivery').textContent = '₹' + totalWithDelivery.toFixed(2);
 
-  const active = filteredByDate.filter(o => o.status !== 'Cancelled');
-  let deliveredSales = 0, pendingSales = 0, upiSales = 0;
-  
-  const deliveredOrders = filteredByDate.filter(o => o.status === 'Delivered');
-  deliveredOrders.forEach(o => deliveredSales += ((parseFloat(o.total)||0) + (parseFloat(o.delivery_charge)||0)));
-  const pendingOrders = filteredByDate.filter(o => o.payment_status === 'Payment Pending');
-  pendingOrders.forEach(o => pendingSales += ((parseFloat(o.total)||0) + (parseFloat(o.delivery_charge)||0)));
-  const upiOrders = filteredByDate.filter(o => o.payment_status === 'UPI Done');
-  upiOrders.forEach(o => upiSales += ((parseFloat(o.total)||0) + (parseFloat(o.delivery_charge)||0)));
+  // New Delivered (Cash) Box updates
+  if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = deliveredCashOrders.length;
+  if ($('stat-delivered-cash-total')) $('stat-delivered-cash-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+  // Renamed Delivered (UPI) Box updates
+  if ($('stat-delivered-upi')) $('stat-delivered-upi').textContent = deliveredUpiOrders.length;
+  if ($('stat-delivered-upi-total')) $('stat-delivered-upi-total').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+  // Total Delivered updates
+  if ($('stat-delivered')) $('stat-delivered').textContent = allDeliveredOrders.length;
+  if ($('stat-delivered-total')) $('stat-delivered-total').textContent = '₹' + (cashTotal + upiTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+  // Payment Pending updates
+  if ($('stat-payment-pending')) $('stat-payment-pending').textContent = pendingOrders.length;
+  if ($('stat-payment-pending-total')) $('stat-payment-pending-total').textContent = '₹' + pendingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
   let uniqueAddresses = new Set();
-  active.forEach(o => { let addr = (o.address || '').trim().toLowerCase(); if (addr) uniqueAddresses.add(addr); });
-
-  if ($('stat-total-orders')) $('stat-total-orders').textContent = uniqueAddresses.size || active.length;
-  if ($('stat-delivered')) $('stat-delivered').textContent = deliveredOrders.length;
-  if ($('stat-delivered-total')) $('stat-delivered-total').textContent = '₹' + deliveredSales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('stat-payment-pending')) $('stat-payment-pending').textContent = pendingOrders.length;
-  if ($('stat-payment-pending-total')) $('stat-payment-pending-total').textContent = '₹' + pendingSales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('stat-upi-done')) $('stat-upi-done').textContent = upiOrders.length;
-  if ($('stat-upi-done-total')) $('stat-upi-done-total').textContent = '₹' + upiSales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  filteredByDate.filter(o => o.status !== 'Cancelled').forEach(o => { let addr = (o.address || '').trim().toLowerCase(); if (addr) uniqueAddresses.add(addr); });
+  if ($('stat-total-orders')) $('stat-total-orders').textContent = uniqueAddresses.size || filteredByDate.filter(o => o.status !== 'Cancelled').length;
 
   let riderData = {}, totalRiderSales = 0;
   const PER_ORDER_RATE = $('rider-rate-input') ? (parseFloat($('rider-rate-input').value) || 0) : 25;
@@ -462,9 +441,10 @@ function renderOrders() {
   const tbody = $('orders-body');
   const filtered = allOrders.filter(o => o.date && o.date.slice(0, 10) === currentFilterDate).filter(o => {
     if (currentFilter === 'All') return true;
-    if (currentFilter === 'Delivered') return o.status === 'Delivered';
+    if (currentFilter === 'Delivered (Total)') return o.status === 'Delivered';
+    if (currentFilter === 'Delivered (Cash)') return o.payment_status === 'Cash' || (o.payment_status||'').includes('Split');
+    if (currentFilter === 'Delivered (UPI)') return o.payment_status === 'UPI Done' || (o.payment_status||'').includes('Split');
     if (currentFilter === 'Payment Pending') return o.payment_status === 'Payment Pending' || o.payment_status === 'Pending';
-    if (currentFilter === 'UPI Done') return o.payment_status === 'UPI Done';
     return false;
   });
 
@@ -484,7 +464,7 @@ function createRow(order) {
   const tr = document.createElement('tr');
   tr.style.cssText = 'border-top:1px solid #1e2030;';
   const isConfirming = pendingDelete === order.__backendId;
-  const statusColor = (order.payment_status === 'UPI Done') ? '#3b82f6' : (order.payment_status === 'Payment Pending') ? '#f59e0b' : (order.payment_status === 'Cash') ? '#22c55e' : (order.payment_status && order.payment_status.includes('Split')) ? '#a855f7' : '#6b7084';
+  const statusColor = (order.payment_status === 'UPI Done') ? '#3b82f6' : (order.payment_status === 'Payment Pending') ? '#f59e0b' : (order.payment_status === 'Cash') ? '#10b981' : (order.payment_status && order.payment_status.includes('Split')) ? '#a855f7' : '#6b7084';
 
   tr.innerHTML = `
     <td class="px-4 py-3 font-medium" style="color:#60a5fa;">#${esc(order.order_id)}</td>
@@ -496,7 +476,7 @@ function createRow(order) {
     <td class="px-4 py-3 text-center">
       <select onchange="changeStatus('${order.__backendId}', this.value)" class="bg-transparent border rounded px-2 py-1 outline-none text-xs font-semibold cursor-pointer" style="border-color:${statusColor}; color:${statusColor};">
         <option value="Payment Pending" ${order.payment_status === 'Payment Pending' ? 'selected' : ''} style="color:#f59e0b; background:#181a24;">Payment Pending</option>
-        <option value="Cash" ${order.payment_status === 'Cash' ? 'selected' : ''} style="color:#22c55e; background:#181a24;">Delivered (Cash)</option>
+        <option value="Cash" ${order.payment_status === 'Cash' ? 'selected' : ''} style="color:#10b981; background:#181a24;">Delivered (Cash)</option>
         <option value="UPI Done" ${order.payment_status === 'UPI Done' ? 'selected' : ''} style="color:#3b82f6; background:#181a24;">Delivered (UPI)</option>
         ${(order.payment_status || '').includes('Split') ? `<option value="${esc(order.payment_status)}" selected style="color:#a855f7; background:#181a24;">Delivered (Split)</option>` : ''}
       </select>
