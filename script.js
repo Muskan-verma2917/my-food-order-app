@@ -219,7 +219,7 @@ window.handlePremiumFormSubmit = async function(event) {
     showToast(`✅ Cloud Sync Success! ${allItems.length} item(s) saved!`);
     
     $('new-premium-order-form').reset(); $('p-grand-total').textContent = '₹0'; $('p-subtotal').textContent = '₹0'; $('p-delivery-display').textContent = '₹0'; $('split-inputs').classList.add('hidden');
-    $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold hover:opacity-80" style="color: #ff5a36;">+ Add Item</button></div>`;
+    $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(1)" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button></div>`;
     premRestCount = 1;
     setTimeout(() => toggleModal(false), 500);
 
@@ -230,20 +230,26 @@ window.handlePremiumFormSubmit = async function(event) {
   }
 };
 
-// --- FIREBASE STATUS & DELETE LOGIC (LOCK REMOVED) ---
+// --- FIREBASE STATUS LOGIC (SAFETY LOCK RESTORED) ---
 window.changeStatus = async function(backendId, newPaymentStatus) {
   const orderIndex = allOrders.findIndex(o => o.__backendId === backendId);
   if (orderIndex === -1) return;
   
   let order = allOrders[orderIndex];
+  let oldStatus = order.payment_status || '';
 
-  // Ab koi safety lock nahi hai. Aap kuch bhi change karengi wo directly cloud pe update ho jayega.
-  let newStatus = order.status;
-  if (newPaymentStatus === 'UPI Done' || newPaymentStatus === 'Cash' || newPaymentStatus.includes('Split')) {
-      newStatus = 'Delivered';
-  } else if (newPaymentStatus === 'Payment Pending') {
-      newStatus = 'Payment Pending';
+  // SAFETY LOCK: Agar already UPI/Split tha, aur galti se 'Cash' daba de, toh amount safe rahega!
+  if (newPaymentStatus === 'Cash' && (oldStatus === 'UPI Done' || oldStatus.includes('Split'))) {
+      await dbOrders.child(backendId).update({ status: 'Delivered' });
+      showToast('✅ UPI Amount Protected! (Status Delivered)'); 
+      // UI ko theek karne ke liye table dobara refresh kar dete hain
+      renderOrders(); 
+      return; 
   }
+  
+  let newStatus = order.status;
+  if (newPaymentStatus === 'UPI Done' || newPaymentStatus === 'Cash') newStatus = 'Delivered';
+  else if (newPaymentStatus === 'Payment Pending') newStatus = 'Payment Pending';
   
   await dbOrders.child(backendId).update({
       payment_status: newPaymentStatus,
