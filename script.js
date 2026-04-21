@@ -23,9 +23,9 @@ function getLocalIsoDate() {
 }
 
 let allOrders = [];
-let currentTableFilter = 'All'; // Filter for the bottom table (Payment Status)
+let currentTableFilter = 'All'; 
 let currentFilterDate = getLocalIsoDate(); 
-let currentShiftFilter = 'All'; // Filter for top boxes (Before/After Lunch)
+let currentShiftFilter = 'All'; 
 let orderCounter = 0;
 let pendingDelete = null;
 
@@ -130,7 +130,7 @@ function showToast(msg, type='success') {
   if(container) { container.appendChild(t); setTimeout(() => t.remove(), 4000); } else { alert(msg); }
 }
 
-// --- FILTER FUNCTION (NOW HANDLES BOTH DATE & SHIFT) ---
+// --- FILTER FUNCTION ---
 window.filterData = function() { 
   currentFilterDate = $('date-filter').value; 
   currentShiftFilter = $('shift-filter') ? $('shift-filter').value : 'All';
@@ -165,7 +165,7 @@ window.handlePremiumFormSubmit = async function(event) {
     const contact = $('p-contact').value.trim();
     const address = $('p-address').value.trim();
     const rider = $('p-rider').value.trim();
-    const shift = $('p-shift').value; // <--- READ THE SHIFT FROM FORM
+    const shift = $('p-shift').value;
     const deliveryCharge = parseFloat($('p-del-charge').value) || 0;
 
     if (!paymentMode) throw new Error("Select a Payment Mode!");
@@ -201,7 +201,7 @@ window.handlePremiumFormSubmit = async function(event) {
         total: item.total,
         status: status,
         date: orderDate,
-        shift: shift, // <--- SAVE SHIFT TO CLOUD
+        shift: shift,
         address: address,
         customer_address: address,
         location: address,
@@ -270,10 +270,7 @@ window.openEditModal = function(backendId) {
   const order = allOrders.find(o => o.__backendId === backendId);
   if (!order) return;
   $('edit-restaurant').value = order.customer_name || ''; $('edit-item-name').value = order.item_name || ''; $('edit-rate').value = order.unit_price || ''; $('edit-qty').value = order.quantity || ''; $('edit-delivery').value = order.delivery_charge || ''; $('edit-rider').value = order.rider || ''; $('edit-contact').value = order.contact || ''; $('edit-address').value = order.address || order.customer_address || '';
-  
-  // Load Shift if exists
   if($('edit-shift')) $('edit-shift').value = order.shift || 'Before Lunch';
-
   let pStatus = order.payment_status || '';
   if (pStatus.includes('Split')) {
       $('edit-payment-status').value = 'Split';
@@ -339,11 +336,15 @@ $('app-title').textContent = defaultConfig.app_title;
 $('app').style.background = defaultConfig.background_color;
 if (typeof lucide !== 'undefined') lucide.createIcons();
 
+function countUniqueOrders(arr) {
+  let s = new Set();
+  arr.forEach(o => s.add(o.order_id || o.__backendId));
+  return s.size;
+}
+
 function updateStats() {
-  // FILTER BY BOTH DATE AND SHIFT
   const filteredData = allOrders.filter(o => {
     const isDateMatch = o.date && o.date.slice(0, 10) === currentFilterDate;
-    // Puraane orders jinme shift nahi hai, wo "All" me dikhenge
     const isShiftMatch = currentShiftFilter === 'All' || o.shift === currentShiftFilter || (!o.shift && currentShiftFilter === 'All');
     return isDateMatch && isShiftMatch;
   });
@@ -372,35 +373,34 @@ function updateStats() {
     }
   });
 
-  const deliveredCashOrders = filteredData.filter(o => o.payment_status === 'Cash' || (o.payment_status || '').includes('Split'));
-  const deliveredUpiOrders = filteredData.filter(o => o.payment_status === 'UPI Done' || (o.payment_status || '').includes('Split'));
-  const allDeliveredOrders = filteredData.filter(o => o.status === 'Delivered');
-  const pendingOrders = filteredData.filter(o => o.payment_status === 'Payment Pending');
+  const activeOrders = filteredData.filter(o => o.status !== 'Cancelled');
+  const deliveredCashOrders = activeOrders.filter(o => o.payment_status === 'Cash' || (o.payment_status || '').includes('Split'));
+  const deliveredUpiOrders = activeOrders.filter(o => o.payment_status === 'UPI Done' || (o.payment_status || '').includes('Split'));
+  const allDeliveredOrders = activeOrders.filter(o => o.status === 'Delivered');
+  const pendingOrders = activeOrders.filter(o => o.payment_status === 'Payment Pending');
 
   if ($('stat-sales-inr')) $('stat-sales-inr').textContent = '₹' + pureSales.toFixed(2);
   if ($('stat-sales-delivery')) $('stat-sales-delivery').textContent = '₹' + totalWithDelivery.toFixed(2);
 
-  if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = deliveredCashOrders.length;
+  // YAHAN PAR FIX HAI (Count unique orders instead of addresses)
+  if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = countUniqueOrders(deliveredCashOrders);
   if ($('stat-delivered-cash-total')) $('stat-delivered-cash-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
-  if ($('stat-delivered-upi')) $('stat-delivered-upi').textContent = deliveredUpiOrders.length;
+  if ($('stat-delivered-upi')) $('stat-delivered-upi').textContent = countUniqueOrders(deliveredUpiOrders);
   if ($('stat-delivered-upi-total')) $('stat-delivered-upi-total').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
-  if ($('stat-delivered')) $('stat-delivered').textContent = allDeliveredOrders.length;
+  if ($('stat-delivered')) $('stat-delivered').textContent = countUniqueOrders(allDeliveredOrders);
   if ($('stat-delivered-total')) $('stat-delivered-total').textContent = '₹' + (cashTotal + upiTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
-  if ($('stat-payment-pending')) $('stat-payment-pending').textContent = pendingOrders.length;
+  if ($('stat-payment-pending')) $('stat-payment-pending').textContent = countUniqueOrders(pendingOrders);
   if ($('stat-payment-pending-total')) $('stat-payment-pending-total').textContent = '₹' + pendingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
-  let uniqueAddresses = new Set();
-  filteredData.filter(o => o.status !== 'Cancelled').forEach(o => { let addr = (o.address || '').trim().toLowerCase(); if (addr) uniqueAddresses.add(addr); });
-  if ($('stat-total-orders')) $('stat-total-orders').textContent = uniqueAddresses.size || filteredData.filter(o => o.status !== 'Cancelled').length;
+  if ($('stat-total-orders')) $('stat-total-orders').textContent = countUniqueOrders(activeOrders);
 
   let riderData = {}, totalRiderSales = 0;
   const PER_ORDER_RATE = $('rider-rate-input') ? (parseFloat($('rider-rate-input').value) || 0) : 25;
 
-  filteredData.forEach(o => {
-    if (o.status === 'Cancelled') return;
+  activeOrders.forEach(o => {
     let rawRiderName = (o.rider || '').trim();
     if (!rawRiderName || rawRiderName.toLowerCase() === 'unassigned') return; 
     let isSalary = rawRiderName.toLowerCase().includes('salary');
@@ -430,8 +430,7 @@ function updateStats() {
   }
 
   let restData = {}, totalRestPureSales = 0;
-  filteredData.forEach(o => {
-    if (o.status === 'Cancelled') return;
+  activeOrders.forEach(o => {
     let restName = (o.customer_name || 'Unknown').trim();
     if (!restName) return;
     let itemTotal = parseFloat(o.total) || 0;
@@ -475,7 +474,6 @@ function renderOrders() {
   if($('empty-state')) $('empty-state').classList.add('hidden');
 
   const fragment = document.createDocumentFragment();
-  // Reverse loop to show newest order on top
   for (let i = filtered.length - 1; i >= 0; i--) {
     fragment.appendChild(createRow(filtered[i]));
   }
@@ -488,7 +486,6 @@ function createRow(order) {
   const isConfirming = pendingDelete === order.__backendId;
   const statusColor = (order.payment_status === 'UPI Done') ? '#3b82f6' : (order.payment_status === 'Payment Pending') ? '#f59e0b' : (order.payment_status === 'Cash') ? '#10b981' : (order.payment_status && order.payment_status.includes('Split')) ? '#a855f7' : '#6b7084';
 
-  // Chota tag lagaya hai jisse pata chale ki order kis shift ka hai
   const shiftBadge = order.shift === 'After Lunch' ? '🌙' : (order.shift === 'Before Lunch' ? '☀️' : '');
 
   tr.innerHTML = `
@@ -515,7 +512,6 @@ function createRow(order) {
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
-// --- FILTER BUTTONS EVENT LISTENER (TABLE ONLY) ---
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     currentTableFilter = btn.dataset.filter;
