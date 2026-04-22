@@ -25,7 +25,7 @@ function getLocalIsoDate() {
 
 let allOrders = [];
 let menuList = []; 
-let editingMenuId = null; // NEW: To keep track of which menu item is being edited
+let editingMenuId = null; 
 let currentTableFilter = 'All'; 
 let currentFilterDate = getLocalIsoDate(); 
 let currentShiftFilter = 'All'; 
@@ -67,21 +67,24 @@ dbMenu.on('value', (snapshot) => {
   renderMenuTable();
 });
 
-// --- UI FUNCTIONS ---
+// --- UI FUNCTIONS (FIXED) ---
 window.toggleModal = function(show) {
   const modal = $('form-modal');
+  if(!modal) return;
   if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; } 
   else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; }
 };
 
 window.toggleEditModal = function(show) {
   const modal = $('edit-modal');
+  if(!modal) return;
   if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; } 
   else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; }
 };
 
 window.toggleMenuModal = function(show) {
   const modal = $('menu-modal');
+  if(!modal) return;
   if (show) { 
     modal.classList.remove('hidden'); 
     document.body.style.overflow = 'hidden'; 
@@ -90,7 +93,7 @@ window.toggleMenuModal = function(show) {
   else { 
     modal.classList.add('hidden'); 
     document.body.style.overflow = 'auto'; 
-    cancelMenuEdit(); // Reset form if they close it while editing
+    cancelMenuEdit(); 
   }
 };
 
@@ -104,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
   $('edit-delivery')?.addEventListener('input', updateEditTotal);
 });
 
-// --- MENU MASTER LOGIC (WITH EDIT FEATURE) ---
+// --- MENU MASTER LOGIC ---
 window.handleMenuSubmit = async function() {
   const rest = $('menu-rest-input').value.trim();
   const item = $('menu-item-input').value.trim();
@@ -117,12 +120,10 @@ window.handleMenuSubmit = async function() {
 
   try {
     if (editingMenuId) {
-      // IF EDITING EXISTING ITEM
       await dbMenu.child(editingMenuId).update({ restaurant: rest, item: item, rate: rate });
       showToast(`✅ ${item} updated successfully!`);
-      cancelMenuEdit(); // Reset form back to Add mode
+      cancelMenuEdit(); 
     } else {
-      // IF ADDING NEW ITEM
       const newItemRef = dbMenu.push();
       await newItemRef.set({ restaurant: rest, item: item, rate: rate });
       showToast(`✅ ${item} added to Menu!`);
@@ -138,22 +139,17 @@ window.handleMenuSubmit = async function() {
 window.editMenuItem = function(id) {
   const m = menuList.find(x => x.__backendId === id);
   if(!m) return;
-  
-  // Fill the form at the top
   $('menu-rest-input').value = m.restaurant;
   $('menu-item-input').value = m.item;
   $('menu-rate-input').value = m.rate;
-  
-  // Change UI to Edit Mode
   editingMenuId = id;
   $('menu-form-title').textContent = 'Update Menu Item';
   $('menu-form-title').style.color = '#ff5a36';
   $('menu-save-btn').textContent = 'Update';
-  $('menu-cancel-btn').classList.remove('hidden'); // Show cancel button
+  $('menu-cancel-btn').classList.remove('hidden'); 
 };
 
 window.cancelMenuEdit = function() {
-  // Clear inputs and revert to Add Mode
   $('menu-rest-input').value = '';
   $('menu-item-input').value = '';
   $('menu-rate-input').value = '';
@@ -161,14 +157,14 @@ window.cancelMenuEdit = function() {
   $('menu-form-title').textContent = 'Add New Menu Item';
   $('menu-form-title').style.color = '';
   $('menu-save-btn').textContent = 'Add';
-  $('menu-cancel-btn').classList.add('hidden'); // Hide cancel button
+  $('menu-cancel-btn').classList.add('hidden'); 
 };
 
 window.deleteMenuItem = async function(id) {
   if(confirm("Are you sure you want to delete this menu item?")) {
     await dbMenu.child(id).remove();
     showToast('🗑️ Menu item deleted');
-    if (editingMenuId === id) cancelMenuEdit(); // Agar edit kar rahe the aur delete kar diya, to form reset karo
+    if (editingMenuId === id) cancelMenuEdit(); 
   }
 };
 
@@ -184,7 +180,6 @@ window.renderMenuTable = function() {
   let sortedMenu = [...menuList].sort((a,b) => a.restaurant.localeCompare(b.restaurant) || a.item.localeCompare(b.item));
 
   sortedMenu.forEach(m => {
-    // Note: Added Pencil (Edit) button here
     tbody.innerHTML += `
       <tr class="hover:bg-[#1e212b] transition-colors">
         <td class="px-4 py-2 font-medium text-white">${esc(m.restaurant)}</td>
@@ -300,6 +295,15 @@ window.calcPremiumTotal = function() {
   $('p-grand-total').textContent = '₹' + grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
+function showToast(msg, type='success') {
+  const t = document.createElement('div');
+  t.className = 'toast rounded-lg px-4 py-2 text-sm font-medium shadow-lg z-[9999]';
+  t.style.cssText = type === 'error' ? 'background:#dc2626;color:#fff;' : 'background:#16a34a;color:#fff;';
+  t.textContent = msg;
+  const container = document.getElementById('toast-container');
+  if(container) { container.appendChild(t); setTimeout(() => t.remove(), 4000); } else { alert(msg); }
+}
+
 // --- FILTER FUNCTION ---
 window.filterData = function() { 
   currentFilterDate = $('date-filter').value; 
@@ -308,11 +312,11 @@ window.filterData = function() {
   renderOrders(); 
 }
 
-// --- FIREBASE SUBMIT LOGIC ---
+// --- FIREBASE SUBMIT LOGIC (FAST CLOSE APPLIED) ---
 window.handlePremiumFormSubmit = async function(event) {
   if (event) event.preventDefault();
   const btn = $('place-order-btn');
-  if(btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.textContent = 'Saving to Cloud...'; }
+  if(btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.textContent = 'Saving...'; }
 
   try {
     const restBlocks = document.querySelectorAll('.rest-block');
@@ -385,34 +389,42 @@ window.handlePremiumFormSubmit = async function(event) {
       isFirstItem = false;
     }
 
-    if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Place Order'; }
     showToast(`✅ Cloud Sync Success! ${allItems.length} item(s) saved!`);
     
-    $('new-premium-order-form').reset(); $('p-grand-total').textContent = '₹0'; $('p-subtotal').textContent = '₹0'; $('p-delivery-display').textContent = '₹0'; $('split-inputs').classList.add('hidden');
-    $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold hover:opacity-80" style="color: #ff5a36;">+ Add Item</button></div>`;
+    $('new-premium-order-form').reset(); 
+    $('p-grand-total').textContent = '₹0'; $('p-subtotal').textContent = '₹0'; $('p-delivery-display').textContent = '₹0'; $('split-inputs').classList.add('hidden');
+    $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button></div>`;
     premRestCount = 1;
-    setTimeout(() => toggleModal(false), 500);
+    
+    toggleModal(false); // Form will close instantly now!
 
   } catch (err) {
     console.error(err); 
     showToast('❌ Cloud Error: ' + err.message, 'error'); 
+  } finally {
     if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Place Order'; }
   }
 };
 
-// --- FIREBASE STATUS LOGIC (LOCK REMOVED) ---
+// --- FIREBASE STATUS LOGIC (STRICT LOCK KEPT) ---
 window.changeStatus = async function(backendId, newPaymentStatus) {
   const orderIndex = allOrders.findIndex(o => o.__backendId === backendId);
   if (orderIndex === -1) return;
   
   let order = allOrders[orderIndex];
+  let oldStatus = order.payment_status || '';
 
-  let newStatus = order.status;
-  if (newPaymentStatus === 'UPI Done' || newPaymentStatus === 'Cash' || newPaymentStatus.includes('Split')) {
-      newStatus = 'Delivered';
-  } else if (newPaymentStatus === 'Payment Pending') {
-      newStatus = 'Payment Pending';
+  if (oldStatus === 'UPI Done' || oldStatus.includes('Split')) {
+      if (newPaymentStatus !== oldStatus) {
+          showToast('🔒 Locked: Bank amount cannot be changed!', 'error'); 
+          renderOrders(); 
+          return; 
+      }
   }
+  
+  let newStatus = order.status;
+  if (newPaymentStatus === 'UPI Done' || newPaymentStatus === 'Cash') newStatus = 'Delivered';
+  else if (newPaymentStatus === 'Payment Pending') newStatus = 'Payment Pending';
   
   await dbOrders.child(backendId).update({
       payment_status: newPaymentStatus,
@@ -429,13 +441,13 @@ window.confirmDelete = async function(backendId) {
   showToast('Order deleted from Cloud');
 };
 
-// --- FIREBASE EDIT LOGIC ---
+// --- FIREBASE EDIT LOGIC (FAST CLOSE APPLIED) ---
 let editingOrderId = null;
 window.openEditModal = function(backendId) {
   editingOrderId = backendId;
   const order = allOrders.find(o => o.__backendId === backendId);
   if (!order) return;
-  $('edit-restaurant').value = order.customer_name || ''; $('edit-item-name').value = order.item_name || ''; $('edit-rate').value = order.unit_price || ''; $('edit-qty').value = order.quantity || ''; $('edit-delivery').value = order.delivery_charge || ''; $('edit-rider').value = order.rider || ''; $('edit-contact').value = order.contact || ''; $('edit-address').value = order.address || order.customer_address || '';
+  $('edit-restaurant').value = order.customer_name || ''; $('edit-item-name').value = order.item_name || ''; $('edit-rate').value = order.unit_price || ''; $('edit-qty').value = order.quantity || ''; $('edit-delivery').value = order.delivery_charge || 0; $('edit-rider').value = order.rider || ''; $('edit-contact').value = order.contact || ''; $('edit-address').value = order.address || order.customer_address || '';
   if($('edit-shift')) $('edit-shift').value = order.shift || 'Before Lunch';
   let pStatus = order.payment_status || '';
   if (pStatus.includes('Split')) {
@@ -488,7 +500,8 @@ window.handleEditSubmit = async function(event) {
 
     await dbOrders.child(editingOrderId).update(updatedData);
     showToast('✅ Order updated in Cloud!'); 
-    toggleEditModal(false);
+    
+    toggleEditModal(false); // Modal will close instantly now!
 
   } catch (err) { 
       showToast('❌ ' + err.message, 'error'); 
