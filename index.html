@@ -171,20 +171,20 @@
       <div class="p-6 overflow-y-auto flex-1">
         <div class="bg-[#16181f] p-4 rounded-xl border border-slate-700 mb-6 relative">
           <h3 id="menu-form-title" class="text-sm font-semibold mb-3 text-slate-300">Add New Menu Item</h3>
-          <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-            <div class="md:col-span-1">
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+            <div class="md:col-span-3">
               <label class="block text-[10px] text-slate-500 mb-1">Restaurant</label>
               <input type="text" id="menu-rest-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="e.g. Banke">
             </div>
-            <div class="md:col-span-2">
+            <div class="md:col-span-5">
               <label class="block text-[10px] text-slate-500 mb-1">Item Name</label>
               <input type="text" id="menu-item-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="e.g. 1/2 shahi paneer">
             </div>
-            <div class="md:col-span-2">
+            <div class="md:col-span-4">
               <label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label>
               <div class="flex gap-2">
-                <input type="number" id="menu-rate-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="100">
-                <button type="button" id="menu-save-btn" onclick="handleMenuSubmit()" class="px-4 rounded-lg font-bold text-white transition hover:opacity-90 whitespace-nowrap" style="background:#ff5a36;">Add</button>
+                <input type="number" id="menu-rate-input" class="flex-1 min-w-[80px] bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="100">
+                <button type="button" id="menu-save-btn" onclick="handleMenuSubmit()" class="px-4 rounded-lg font-bold text-white transition hover:opacity-90 whitespace-nowrap shrink-0" style="background:#ff5a36;">Add</button>
                 <button type="button" id="menu-cancel-btn" onclick="cancelMenuEdit()" class="hidden px-3 rounded-lg font-bold text-slate-400 bg-slate-700 hover:text-white transition shrink-0" title="Cancel Edit">✕</button>
               </div>
             </div>
