@@ -14,6 +14,7 @@ firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 const dbOrders = database.ref('orders');
 const dbCounter = database.ref('orderCounter');
+const dbMenu = database.ref('menu'); // NEW: Database for Menu Items
 
 // --- TIMEZONE DATE FIX ---
 function getLocalIsoDate() {
@@ -23,6 +24,7 @@ function getLocalIsoDate() {
 }
 
 let allOrders = [];
+let menuList = []; // Array to store menu items
 let currentTableFilter = 'All'; 
 let currentFilterDate = getLocalIsoDate(); 
 let currentShiftFilter = 'All'; 
@@ -53,6 +55,18 @@ dbCounter.on('value', (snapshot) => {
   orderCounter = snapshot.val() || 0;
 });
 
+// Listener for Menu List updates
+dbMenu.on('value', (snapshot) => {
+  const data = snapshot.val();
+  menuList = [];
+  if (data) {
+    Object.keys(data).forEach(key => {
+      menuList.push({ __backendId: key, ...data[key] });
+    });
+  }
+  renderMenuTable();
+});
+
 // --- UI FUNCTIONS ---
 window.toggleModal = function(show) {
   const modal = $('form-modal');
@@ -66,13 +80,137 @@ window.toggleEditModal = function(show) {
   else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; }
 };
 
+window.toggleMenuModal = function(show) {
+  const modal = $('menu-modal');
+  if (show) { 
+    modal.classList.remove('hidden'); 
+    document.body.style.overflow = 'hidden'; 
+    if (typeof lucide !== 'undefined') lucide.createIcons(); // Refresh icons
+  } 
+  else { 
+    modal.classList.add('hidden'); 
+    document.body.style.overflow = 'auto'; 
+  }
+};
+
 document.addEventListener('DOMContentLoaded', function() {
   $('form-modal')?.addEventListener('click', e => { if (e.target === $('form-modal')) toggleModal(false); });
   $('edit-modal')?.addEventListener('click', e => { if (e.target === $('edit-modal')) toggleEditModal(false); });
+  $('menu-modal')?.addEventListener('click', e => { if (e.target === $('menu-modal')) toggleMenuModal(false); });
+  
   $('edit-rate')?.addEventListener('input', updateEditTotal);
   $('edit-qty')?.addEventListener('input', updateEditTotal);
   $('edit-delivery')?.addEventListener('input', updateEditTotal);
 });
+
+// --- MENU MASTER LOGIC (THE MAGIC) ---
+window.handleMenuSubmit = async function() {
+  const rest = $('menu-rest-input').value.trim();
+  const item = $('menu-item-input').value.trim();
+  const rate = parseFloat($('menu-rate-input').value);
+
+  if(!rest || !item || !rate) {
+    showToast('Please fill Restaurant, Item, and Rate properly!', 'error');
+    return;
+  }
+
+  try {
+    const newItemRef = dbMenu.push();
+    await newItemRef.set({ restaurant: rest, item: item, rate: rate });
+    showToast(`✅ ${item} added to Menu!`);
+    $('menu-item-input').value = '';
+    $('menu-rate-input').value = '';
+    $('menu-item-input').focus();
+  } catch (err) {
+    showToast('Error saving menu: ' + err.message, 'error');
+  }
+};
+
+window.deleteMenuItem = async function(id) {
+  if(confirm("Are you sure you want to delete this menu item?")) {
+    await dbMenu.child(id).remove();
+    showToast('🗑️ Menu item deleted');
+  }
+};
+
+window.renderMenuTable = function() {
+  const tbody = $('menu-list-body');
+  if(!tbody) return;
+  tbody.innerHTML = '';
+  if(menuList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-500">Menu is empty. Add your first item above!</td></tr>`;
+    return;
+  }
+  
+  // Sort alphabetically by restaurant then item
+  let sortedMenu = [...menuList].sort((a,b) => a.restaurant.localeCompare(b.restaurant) || a.item.localeCompare(b.item));
+
+  sortedMenu.forEach(m => {
+    tbody.innerHTML += `
+      <tr class="hover:bg-[#1e212b] transition-colors">
+        <td class="px-4 py-2 font-medium text-white">${esc(m.restaurant)}</td>
+        <td class="px-4 py-2 text-slate-300">${esc(m.item)}</td>
+        <td class="px-4 py-2 text-right font-bold text-[#ff5a36]">₹${m.rate}</td>
+        <td class="px-4 py-2 text-center">
+          <button onclick="deleteMenuItem('${m.__backendId}')" class="text-slate-500 hover:text-red-500 p-1">
+            <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+// --- AUTO-FILL RATE LOGIC ---
+window.autoFillRate = function(itemInput) {
+  const row = itemInput.closest('.item-row');
+  const block = itemInput.closest('.rest-block');
+  if(!row || !block) return;
+
+  const restName = block.querySelector('.rest-name').value.trim().toLowerCase();
+  const itemName = itemInput.value.trim().toLowerCase();
+  const rateInput = row.querySelector('.item-rate');
+
+  if(restName && itemName) {
+    // Find matching item in menu list
+    const match = menuList.find(m => m.restaurant.toLowerCase() === restName && m.item.toLowerCase() === itemName);
+    if(match) {
+      if(rateInput.value != match.rate) {
+        rateInput.value = match.rate;
+        calcPremiumTotal(); // Update Total
+        // Optional: show small visual feedback
+        itemInput.style.borderColor = '#10b981'; 
+        setTimeout(() => itemInput.style.borderColor = '', 1000);
+      }
+    }
+  }
+};
+
+window.autoFillAllItemsInBlock = function(restInput) {
+  // If restaurant changes, check all item rows in that block to auto-fill
+  const block = restInput.closest('.rest-block');
+  if(!block) return;
+  const itemInputs = block.querySelectorAll('.item-name');
+  itemInputs.forEach(inp => autoFillRate(inp));
+};
+
+window.autoFillEditRate = function() {
+  const restName = $('edit-restaurant').value.trim().toLowerCase();
+  const itemName = $('edit-item-name').value.trim().toLowerCase();
+  const rateInput = $('edit-rate');
+  
+  if(restName && itemName) {
+    const match = menuList.find(m => m.restaurant.toLowerCase() === restName && m.item.toLowerCase() === itemName);
+    if(match && rateInput.value != match.rate) {
+      rateInput.value = match.rate;
+      updateEditTotal();
+      $('edit-item-name').style.borderColor = '#10b981'; 
+      setTimeout(() => $('edit-item-name').style.borderColor = '', 1000);
+    }
+  }
+};
+
 
 let premRestCount = 1;
 window.toggleSplitFields = function() {
@@ -89,7 +227,8 @@ window.addPremiumItem = function(restId) {
   const container = document.getElementById(`items-rest-${restId}`);
   const div = document.createElement('div');
   div.className = 'item-row flex gap-2 items-start';
-  div.innerHTML = `<div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button>`;
+  // NOTICE: Added oninput="autoFillRate(this)" to the new item input
+  div.innerHTML = `<div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button>`;
   container.appendChild(div);
 };
 
@@ -101,7 +240,8 @@ window.addPremiumRestaurant = function() {
   const div = document.createElement('div');
   div.className = 'rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f] relative mt-4';
   div.dataset.restId = premRestCount;
-  div.innerHTML = `<button type="button" class="absolute top-3 right-3 text-slate-500 hover:text-red-500 text-xs font-bold uppercase tracking-wider" onclick="removePremiumRest(this)">Remove</button><div class="mb-4 pr-16"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name"></div><div class="items-container space-y-3 mb-3" id="items-rest-${premRestCount}"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold hover:opacity-80" style="color: #ff5a36;">+ Add Item</button>`;
+  // NOTICE: Added autoFillAllItemsInBlock and autoFillRate
+  div.innerHTML = `<button type="button" class="absolute top-3 right-3 text-slate-500 hover:text-red-500 text-xs font-bold uppercase tracking-wider" onclick="removePremiumRest(this)">Remove</button><div class="mb-4 pr-16"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="items-rest-${premRestCount}"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold hover:opacity-80" style="color: #ff5a36;">+ Add Item</button>`;
   wrapper.appendChild(div);
 };
 
@@ -120,15 +260,6 @@ window.calcPremiumTotal = function() {
   $('p-delivery-display').textContent = '₹' + delCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   $('p-grand-total').textContent = '₹' + grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
-
-function showToast(msg, type='success') {
-  const t = document.createElement('div');
-  t.className = 'toast rounded-lg px-4 py-2 text-sm font-medium shadow-lg z-[9999]';
-  t.style.cssText = type === 'error' ? 'background:#dc2626;color:#fff;' : 'background:#16a34a;color:#fff;';
-  t.textContent = msg;
-  const container = document.getElementById('toast-container');
-  if(container) { container.appendChild(t); setTimeout(() => t.remove(), 4000); } else { alert(msg); }
-}
 
 // --- FILTER FUNCTION ---
 window.filterData = function() { 
@@ -219,7 +350,7 @@ window.handlePremiumFormSubmit = async function(event) {
     showToast(`✅ Cloud Sync Success! ${allItems.length} item(s) saved!`);
     
     $('new-premium-order-form').reset(); $('p-grand-total').textContent = '₹0'; $('p-subtotal').textContent = '₹0'; $('p-delivery-display').textContent = '₹0'; $('split-inputs').classList.add('hidden');
-    $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold hover:opacity-80" style="color: #ff5a36;">+ Add Item</button></div>`;
+    $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button></div>`;
     premRestCount = 1;
     setTimeout(() => toggleModal(false), 500);
 
@@ -230,20 +361,25 @@ window.handlePremiumFormSubmit = async function(event) {
   }
 };
 
-// --- FIREBASE STATUS & DELETE LOGIC (LOCK REMOVED) ---
+// --- FIREBASE STATUS LOGIC (100% STRICT LOCK) ---
 window.changeStatus = async function(backendId, newPaymentStatus) {
   const orderIndex = allOrders.findIndex(o => o.__backendId === backendId);
   if (orderIndex === -1) return;
   
   let order = allOrders[orderIndex];
+  let oldStatus = order.payment_status || '';
 
-  // Ab koi safety lock nahi hai. Aap kuch bhi change karengi wo directly cloud pe update ho jayega.
-  let newStatus = order.status;
-  if (newPaymentStatus === 'UPI Done' || newPaymentStatus === 'Cash' || newPaymentStatus.includes('Split')) {
-      newStatus = 'Delivered';
-  } else if (newPaymentStatus === 'Payment Pending') {
-      newStatus = 'Payment Pending';
+  if (oldStatus === 'UPI Done' || oldStatus.includes('Split')) {
+      if (newPaymentStatus !== oldStatus) {
+          showToast('🔒 Locked: Bank amount cannot be changed!', 'error'); 
+          renderOrders(); 
+          return; 
+      }
   }
+  
+  let newStatus = order.status;
+  if (newPaymentStatus === 'UPI Done' || newPaymentStatus === 'Cash') newStatus = 'Delivered';
+  else if (newPaymentStatus === 'Payment Pending') newStatus = 'Payment Pending';
   
   await dbOrders.child(backendId).update({
       payment_status: newPaymentStatus,
