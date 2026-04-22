@@ -107,14 +107,16 @@ document.addEventListener('DOMContentLoaded', function() {
   $('edit-delivery')?.addEventListener('input', updateEditTotal);
 });
 
-// --- MENU MASTER LOGIC ---
+// --- MENU MASTER LOGIC (BULLETPROOF BUG FIX) ---
 window.handleMenuSubmit = async function() {
   const rest = $('menu-rest-input').value.trim();
   const item = $('menu-item-input').value.trim();
-  const rate = parseFloat($('menu-rate-input').value);
+  
+  // Clean number extract karega
+  const rate = parseFloat($('menu-rate-input').value) || 0; 
 
-  if(!rest || !item || !rate) {
-    showToast('Please fill Restaurant, Item, and Rate properly!', 'error');
+  if(!rest || !item) {
+    showToast('Please fill Restaurant and Item Name!', 'error');
     return;
   }
 
@@ -123,13 +125,13 @@ window.handleMenuSubmit = async function() {
       await dbMenu.child(editingMenuId).update({ restaurant: rest, item: item, rate: rate });
       showToast(`✅ ${item} updated successfully!`);
       cancelMenuEdit(); 
+      toggleMenuModal(false); 
     } else {
       const newItemRef = dbMenu.push();
       await newItemRef.set({ restaurant: rest, item: item, rate: rate });
       showToast(`✅ ${item} added to Menu!`);
-      $('menu-item-input').value = '';
-      $('menu-rate-input').value = '';
-      $('menu-item-input').focus();
+      cancelMenuEdit();
+      toggleMenuModal(false); 
     }
   } catch (err) {
     showToast('Error saving menu: ' + err.message, 'error');
@@ -139,9 +141,14 @@ window.handleMenuSubmit = async function() {
 window.editMenuItem = function(id) {
   const m = menuList.find(x => x.__backendId === id);
   if(!m) return;
-  $('menu-rest-input').value = m.restaurant;
-  $('menu-item-input').value = m.item;
-  $('menu-rate-input').value = m.rate;
+  
+  $('menu-rest-input').value = m.restaurant || '';
+  $('menu-item-input').value = m.item || '';
+  
+  // Yahan fix hai: Agar purana data corrupted hai, tab bhi dabba khali nahi rahega
+  let cleanRate = parseFloat(m.rate);
+  $('menu-rate-input').value = isNaN(cleanRate) ? '' : cleanRate;
+  
   editingMenuId = id;
   $('menu-form-title').textContent = 'Update Menu Item';
   $('menu-form-title').style.color = '#ff5a36';
@@ -180,11 +187,15 @@ window.renderMenuTable = function() {
   let sortedMenu = [...menuList].sort((a,b) => a.restaurant.localeCompare(b.restaurant) || a.item.localeCompare(b.item));
 
   sortedMenu.forEach(m => {
+    // Sirf valid rate dikhayega, garbage text nahi
+    let displayRate = parseFloat(m.rate);
+    displayRate = isNaN(displayRate) ? 0 : displayRate;
+
     tbody.innerHTML += `
       <tr class="hover:bg-[#1e212b] transition-colors">
         <td class="px-4 py-2 font-medium text-white">${esc(m.restaurant)}</td>
         <td class="px-4 py-2 text-slate-300">${esc(m.item)}</td>
-        <td class="px-4 py-2 text-right font-bold text-[#ff5a36]">₹${m.rate}</td>
+        <td class="px-4 py-2 text-right font-bold text-[#ff5a36]">₹${displayRate}</td>
         <td class="px-4 py-2 text-center">
           <div class="flex items-center justify-center gap-2">
             <button onclick="editMenuItem('${m.__backendId}')" class="text-blue-400 hover:text-blue-300 p-1" title="Edit Rate">
@@ -312,7 +323,7 @@ window.filterData = function() {
   renderOrders(); 
 }
 
-// --- FIREBASE SUBMIT LOGIC (WITH FORCE CLOSE) ---
+// --- FIREBASE SUBMIT LOGIC ---
 window.handlePremiumFormSubmit = async function(event) {
   if (event) event.preventDefault();
   const btn = $('place-order-btn');
@@ -396,10 +407,7 @@ window.handlePremiumFormSubmit = async function(event) {
     $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button></div>`;
     premRestCount = 1;
     
-    // FORCE CLOSE NEW ORDER MODAL
-    setTimeout(() => {
-      toggleModal(false);
-    }, 400);
+    toggleModal(false);
 
   } catch (err) {
     console.error(err); 
@@ -415,6 +423,15 @@ window.changeStatus = async function(backendId, newPaymentStatus) {
   if (orderIndex === -1) return;
   
   let order = allOrders[orderIndex];
+  let oldStatus = order.payment_status || '';
+
+  if (oldStatus === 'UPI Done' || oldStatus.includes('Split')) {
+      if (newPaymentStatus !== oldStatus) {
+          showToast('🔒 Locked: Bank amount cannot be changed!', 'error'); 
+          renderOrders(); 
+          return; 
+      }
+  }
 
   let newStatus = order.status;
   if (newPaymentStatus === 'UPI Done' || newPaymentStatus === 'Cash' || newPaymentStatus.includes('Split')) {
@@ -438,7 +455,7 @@ window.confirmDelete = async function(backendId) {
   showToast('Order deleted from Cloud');
 };
 
-// --- FIREBASE EDIT LOGIC (WITH FORCE CLOSE) ---
+// --- FIREBASE EDIT LOGIC ---
 let editingOrderId = null;
 window.openEditModal = function(backendId) {
   editingOrderId = backendId;
@@ -498,10 +515,7 @@ window.handleEditSubmit = async function(event) {
     await dbOrders.child(editingOrderId).update(updatedData);
     showToast('✅ Order updated in Cloud!'); 
     
-    // FORCE CLOSE EDIT MODAL
-    setTimeout(() => {
-      toggleEditModal(false);
-    }, 400);
+    toggleEditModal(false); 
 
   } catch (err) { 
       showToast('❌ ' + err.message, 'error'); 
