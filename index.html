@@ -26,14 +26,12 @@
   <div id="app" class="min-h-screen w-full overflow-x-hidden pb-10">
    
    <header class="sticky top-0 z-40 px-4 sm:px-8 py-4 flex flex-col lg:flex-row items-center justify-between gap-4 shadow-md" style="background:rgba(15,17,23,0.95); backdrop-filter:blur(12px); border-bottom:1px solid #1e2030;">
-    
     <div class="flex items-center gap-3 w-full lg:w-auto justify-center lg:justify-start">
      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:#e85d3a;"><i data-lucide="utensils" style="width:18px;height:18px;color:#fff;"></i></div>
      <h1 id="app-title" class="text-lg sm:text-xl font-bold" style="font-family:'Playfair Display',serif;">Daily Delivery Sales</h1>
     </div>
     
     <div class="flex flex-wrap items-center justify-center gap-2 lg:gap-3 w-full lg:w-auto">
-     
      <div class="flex items-center gap-2 text-slate-400 bg-[#1e212b] px-3 py-2 rounded-lg border border-slate-700/50 hover:border-slate-500 transition-colors">
       <input type="date" id="date-filter" class="bg-transparent text-sm font-medium text-slate-200 outline-none cursor-pointer [color-scheme:dark]" onchange="filterData()">
      </div>
@@ -54,7 +52,6 @@
      <button onclick="toggleModal(true)" class="flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-white shadow-lg transition-transform hover:scale-105 text-sm" style="background: #ff5a36;"> 
        <i data-lucide="plus-circle" style="width:16px;height:16px;"></i> New Order 
      </button>
-     
     </div>
    </header>
    
@@ -162,7 +159,7 @@
   </div>
 
   <div id="menu-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-    <div class="relative w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl" style="background:#181a24; border:1px solid #1e2030;">
+    <div class="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl" style="background:#181a24; border:1px solid #1e2030;">
       <button onclick="toggleMenuModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl z-10">✕</button>
       <div class="p-6 border-b border-slate-700 bg-[#1e212b] rounded-t-2xl">
         <h2 class="text-xl font-bold flex items-center gap-2" style="color:#f0ece4; font-family:'Playfair Display',serif;">
@@ -174,7 +171,7 @@
       <div class="p-6 overflow-y-auto flex-1">
         <div class="bg-[#16181f] p-4 rounded-xl border border-slate-700 mb-6 relative">
           <h3 id="menu-form-title" class="text-sm font-semibold mb-3 text-slate-300">Add New Menu Item</h3>
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
             <div class="md:col-span-1">
               <label class="block text-[10px] text-slate-500 mb-1">Restaurant</label>
               <input type="text" id="menu-rest-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="e.g. Banke">
@@ -183,12 +180,12 @@
               <label class="block text-[10px] text-slate-500 mb-1">Item Name</label>
               <input type="text" id="menu-item-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="e.g. 1/2 shahi paneer">
             </div>
-            <div class="md:col-span-1">
+            <div class="md:col-span-2">
               <label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label>
               <div class="flex gap-2">
                 <input type="number" id="menu-rate-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="100">
-                <button type="button" id="menu-save-btn" onclick="handleMenuSubmit()" class="px-4 rounded-lg font-bold text-white transition hover:opacity-90" style="background:#ff5a36;">Add</button>
-                <button type="button" id="menu-cancel-btn" onclick="cancelMenuEdit()" class="hidden px-3 rounded-lg font-bold text-slate-400 bg-slate-700 hover:text-white transition" title="Cancel Edit">✕</button>
+                <button type="button" id="menu-save-btn" onclick="handleMenuSubmit()" class="px-4 rounded-lg font-bold text-white transition hover:opacity-90 whitespace-nowrap" style="background:#ff5a36;">Add</button>
+                <button type="button" id="menu-cancel-btn" onclick="cancelMenuEdit()" class="hidden px-3 rounded-lg font-bold text-slate-400 bg-slate-700 hover:text-white transition shrink-0" title="Cancel Edit">✕</button>
               </div>
             </div>
           </div>
