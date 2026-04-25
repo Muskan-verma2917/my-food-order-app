@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
   $('edit-delivery')?.addEventListener('input', updateEditTotal);
 });
 
-// --- MENU MASTER LOGIC (DUPLICATE CHECKER ADDED) ---
+// --- MENU MASTER LOGIC ---
 window.handleMenuSubmit = async function() {
   const rest = $('menu-rest-input').value.trim();
   const item = $('menu-item-input').value.trim();
@@ -121,12 +121,10 @@ window.handleMenuSubmit = async function() {
 
   try {
     if (editingMenuId) {
-      // Yahan edit ho raha hai, to duplicate check ki zaroorat nahi
       await dbMenu.child(editingMenuId).update({ restaurant: rest, item: item, rate: rate });
       showToast(`✅ ${item} updated successfully!`);
       cancelMenuEdit(); 
     } else {
-      // NAYA ITEM ADD HO RAHA HAI (Duplicate Check Lagaya)
       const isDuplicate = menuList.some(m => 
         m.restaurant.toLowerCase() === rest.toLowerCase() && 
         m.item.toLowerCase() === item.toLowerCase()
@@ -134,10 +132,9 @@ window.handleMenuSubmit = async function() {
 
       if (isDuplicate) {
         showToast(`⚠️ ${item} is already added for ${rest}!`, 'error');
-        return; // Ye code ko yahi rok dega, aage save nahi karega
+        return; 
       }
 
-      // Agar duplicate nahi hai, toh aage bado aur save karo
       const newItemRef = dbMenu.push();
       await newItemRef.set({ restaurant: rest, item: item, rate: rate });
       showToast(`✅ ${item} added to Menu!`);
@@ -185,16 +182,33 @@ window.deleteMenuItem = async function(id) {
   }
 };
 
+// YAHAN PAR FIX HAI (NEW SEARCH LOGIC)
 window.renderMenuTable = function() {
   const tbody = $('menu-list-body');
   if(!tbody) return;
   tbody.innerHTML = '';
-  if(menuList.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-500">Menu is empty. Add your first item above!</td></tr>`;
+  
+  const searchInput = $('menu-search-input');
+  const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  // Filter list based on search bar
+  const filteredMenu = menuList.filter(m => {
+    if (!searchTerm) return true; // Agar search box khali hai, toh sab dikhao
+    const restMatch = (m.restaurant || '').toLowerCase().includes(searchTerm);
+    const itemMatch = (m.item || '').toLowerCase().includes(searchTerm);
+    return restMatch || itemMatch;
+  });
+
+  if(filteredMenu.length === 0) {
+    if (searchTerm) {
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-500">No matching items found for "${esc(searchTerm)}".</td></tr>`;
+    } else {
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-500">Menu is empty. Add your first item above!</td></tr>`;
+    }
     return;
   }
   
-  let sortedMenu = [...menuList].sort((a,b) => a.restaurant.localeCompare(b.restaurant) || a.item.localeCompare(b.item));
+  let sortedMenu = [...filteredMenu].sort((a,b) => a.restaurant.localeCompare(b.restaurant) || a.item.localeCompare(b.item));
 
   sortedMenu.forEach(m => {
     let displayRate = parseFloat(String(m.rate).replace(/[^\d.-]/g, ''));

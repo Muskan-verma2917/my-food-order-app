@@ -191,6 +191,15 @@
           </div>
         </div>
 
+        <div class="mb-3">
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+            </div>
+            <input type="text" id="menu-search-input" class="w-full bg-[#16181f] border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-slate-200 focus:border-[#ff5a36] outline-none transition-colors" placeholder="Search by Restaurant or Item Name..." oninput="renderMenuTable()">
+          </div>
+        </div>
+
         <div class="border border-slate-700 rounded-xl overflow-hidden">
           <table class="w-full text-sm text-left">
             <thead class="bg-[#12141d] text-xs uppercase text-slate-500 tracking-wider">
