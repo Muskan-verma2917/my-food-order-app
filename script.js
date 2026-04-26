@@ -15,6 +15,8 @@ const database = firebase.database();
 const dbOrders = database.ref('orders');
 const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
+// NAYA: Pending cash save karne ke liye
+const dbDailyCash = database.ref('daily_cash'); 
 
 // --- TIMEZONE DATE FIX ---
 function getLocalIsoDate() {
@@ -25,6 +27,9 @@ function getLocalIsoDate() {
 
 let allOrders = [];
 let menuList = []; 
+let depositedCashData = {}; // Cloud se aaya hua deposited cash
+let currentTotalCash = 0;   // Calculation ke liye
+let cashSaveTimeout;        // Timer taaki app freeze na ho
 let editingMenuId = null; 
 let currentTableFilter = 'All'; 
 let currentFilterDate = getLocalIsoDate(); 
@@ -66,6 +71,57 @@ dbMenu.on('value', (snapshot) => {
   }
   renderMenuTable();
 });
+
+// Listener for Pending Cash
+dbDailyCash.on('value', (snapshot) => {
+  depositedCashData = snapshot.val() || {};
+  updatePendingCashUI();
+});
+
+// --- PENDING CASH LOGIC ---
+window.handleDepositedCashChange = function() {
+  const val = parseFloat($('deposited-cash-input').value) || 0;
+  updatePendingCashUI(val); // UI turant update hogi
+
+  // Cloud par thoda ruk kar save karega (800ms) taaki phone hang na ho
+  clearTimeout(cashSaveTimeout);
+  cashSaveTimeout = setTimeout(() => {
+    // Key banegi jaise: '2026-04-26_BeforeLunch'
+    const key = currentFilterDate + "_" + (currentShiftFilter.replace(/\s+/g, '')); 
+    dbDailyCash.child(key).set(val);
+  }, 800);
+};
+
+window.updatePendingCashUI = function(inputVal = null) {
+  const key = currentFilterDate + "_" + (currentShiftFilter.replace(/\s+/g, ''));
+  
+  let deposited = inputVal;
+  // Agar humne khud type nahi kiya, toh Cloud ka data uthao
+  if (deposited === null) {
+     deposited = depositedCashData[key] || 0;
+     if ($('deposited-cash-input')) {
+        $('deposited-cash-input').value = deposited || '';
+     }
+  }
+  
+  let pending = currentTotalCash - deposited;
+  const display = $('pending-cash-display');
+  if (!display) return;
+  
+  if (pending > 0) {
+     display.textContent = `⚠️ Pending: ₹${pending.toFixed(2)}`;
+     display.style.color = '#ef4444'; // Laal rang
+  } else if (pending < 0) {
+     display.textContent = `⚠️ Extra: ₹${Math.abs(pending).toFixed(2)}`;
+     display.style.color = '#f59e0b'; // Santri rang
+  } else if (currentTotalCash > 0 && pending === 0) {
+     display.textContent = `✅ Clear: ₹0.00`;
+     display.style.color = '#10b981'; // Hara rang
+  } else {
+     display.textContent = ''; // Agar koi cash order nahi hai toh khali rakho
+  }
+};
+
 
 // --- UI FUNCTIONS ---
 window.toggleModal = function(show) {
@@ -182,7 +238,6 @@ window.deleteMenuItem = async function(id) {
   }
 };
 
-// YAHAN PAR FIX HAI (NEW SEARCH LOGIC)
 window.renderMenuTable = function() {
   const tbody = $('menu-list-body');
   if(!tbody) return;
@@ -191,9 +246,8 @@ window.renderMenuTable = function() {
   const searchInput = $('menu-search-input');
   const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
-  // Filter list based on search bar
   const filteredMenu = menuList.filter(m => {
-    if (!searchTerm) return true; // Agar search box khali hai, toh sab dikhao
+    if (!searchTerm) return true;
     const restMatch = (m.restaurant || '').toLowerCase().includes(searchTerm);
     const itemMatch = (m.item || '').toLowerCase().includes(searchTerm);
     return restMatch || itemMatch;
@@ -600,6 +654,10 @@ function updateStats() {
 
   if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = countUniqueOrders(deliveredCashOrders);
   if ($('stat-delivered-cash-total')) $('stat-delivered-cash-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+  // NAYA: Global variable update for pending cash calculation
+  currentTotalCash = cashTotal; 
+  updatePendingCashUI();
 
   if ($('stat-delivered-upi')) $('stat-delivered-upi').textContent = countUniqueOrders(deliveredUpiOrders);
   if ($('stat-delivered-upi-total')) $('stat-delivered-upi-total').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
