@@ -15,7 +15,6 @@ const database = firebase.database();
 const dbOrders = database.ref('orders');
 const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
-// NAYA: Pending cash save karne ke liye
 const dbDailyCash = database.ref('daily_cash'); 
 
 // --- TIMEZONE DATE FIX ---
@@ -27,9 +26,9 @@ function getLocalIsoDate() {
 
 let allOrders = [];
 let menuList = []; 
-let depositedCashData = {}; // Cloud se aaya hua deposited cash
-let currentTotalCash = 0;   // Calculation ke liye
-let cashSaveTimeout;        // Timer taaki app freeze na ho
+let depositedCashData = {}; 
+let currentTotalCash = 0;   
+let cashSaveTimeout;        
 let editingMenuId = null; 
 let currentTableFilter = 'All'; 
 let currentFilterDate = getLocalIsoDate(); 
@@ -72,7 +71,6 @@ dbMenu.on('value', (snapshot) => {
   renderMenuTable();
 });
 
-// Listener for Pending Cash
 dbDailyCash.on('value', (snapshot) => {
   depositedCashData = snapshot.val() || {};
   updatePendingCashUI();
@@ -81,12 +79,10 @@ dbDailyCash.on('value', (snapshot) => {
 // --- PENDING CASH LOGIC ---
 window.handleDepositedCashChange = function() {
   const val = parseFloat($('deposited-cash-input').value) || 0;
-  updatePendingCashUI(val); // UI turant update hogi
+  updatePendingCashUI(val); 
 
-  // Cloud par thoda ruk kar save karega (800ms) taaki phone hang na ho
   clearTimeout(cashSaveTimeout);
   cashSaveTimeout = setTimeout(() => {
-    // Key banegi jaise: '2026-04-26_BeforeLunch'
     const key = currentFilterDate + "_" + (currentShiftFilter.replace(/\s+/g, '')); 
     dbDailyCash.child(key).set(val);
   }, 800);
@@ -96,7 +92,6 @@ window.updatePendingCashUI = function(inputVal = null) {
   const key = currentFilterDate + "_" + (currentShiftFilter.replace(/\s+/g, ''));
   
   let deposited = inputVal;
-  // Agar humne khud type nahi kiya, toh Cloud ka data uthao
   if (deposited === null) {
      deposited = depositedCashData[key] || 0;
      if ($('deposited-cash-input')) {
@@ -110,15 +105,15 @@ window.updatePendingCashUI = function(inputVal = null) {
   
   if (pending > 0) {
      display.textContent = `⚠️ Pending: ₹${pending.toFixed(2)}`;
-     display.style.color = '#ef4444'; // Laal rang
+     display.style.color = '#ef4444'; 
   } else if (pending < 0) {
      display.textContent = `⚠️ Extra: ₹${Math.abs(pending).toFixed(2)}`;
-     display.style.color = '#f59e0b'; // Santri rang
+     display.style.color = '#f59e0b'; 
   } else if (currentTotalCash > 0 && pending === 0) {
      display.textContent = `✅ Clear: ₹0.00`;
-     display.style.color = '#10b981'; // Hara rang
+     display.style.color = '#10b981'; 
   } else {
-     display.textContent = ''; // Agar koi cash order nahi hai toh khali rakho
+     display.textContent = ''; 
   }
 };
 
@@ -655,7 +650,7 @@ function updateStats() {
   if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = countUniqueOrders(deliveredCashOrders);
   if ($('stat-delivered-cash-total')) $('stat-delivered-cash-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
-  // NAYA: Global variable update for pending cash calculation
+  // PENDING CASH UPDATE HOGA YAHAN
   currentTotalCash = cashTotal; 
   updatePendingCashUI();
 
@@ -695,7 +690,8 @@ function updateStats() {
           let html = '';
           for (let r in riderData) {
               let d = riderData[r];
-              let payoutText = d.isSalary ? `<span class="text-xs font-semibold text-blue-400 mt-1">📊 On Salary</span>` : `<span class="text-xs font-bold text-green-400 mt-1">💰 Payout: ₹${d.addresses.size * PER_ORDER_RATE}</span>`;
+              // FIX: Payout is now based on Unique Orders instead of Addresses
+              let payoutText = d.isSalary ? `<span class="text-xs font-semibold text-blue-400 mt-1">📊 On Salary</span>` : `<span class="text-xs font-bold text-green-400 mt-1">💰 Payout: ₹${d.uniqueOrders.size * PER_ORDER_RATE}</span>`;
               html += `<div class="flex justify-between items-start gap-4 mb-3 border-b border-slate-700/50 pb-2 last:border-0 last:pb-0"><div class="flex flex-col flex-1"><span class="font-medium text-slate-300 capitalize">${r}</span><span class="text-[10px] text-slate-500">${d.uniqueOrders.size} Orders | ${d.addresses.size} Addr</span>${payoutText}</div><div class="text-right"><span class="text-[10px] text-slate-500 block mb-0.5">Collected</span><span class="font-bold text-white">₹${d.amount.toFixed(2)}</span></div></div>`;
           }
           $('rider-breakdown-content').innerHTML = html;
