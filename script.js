@@ -76,8 +76,11 @@ dbDailyCash.on('value', (snapshot) => {
   updatePendingCashUI();
 });
 
-// --- PENDING CASH LOGIC ---
+// --- PENDING CASH LOGIC (WITH AUTO-SUM FOR FULL DAY) ---
 window.handleDepositedCashChange = function() {
+  // Agar "Full Day" select hai toh type karna allowed nahi hai
+  if (currentShiftFilter === 'All') return; 
+
   const val = parseFloat($('deposited-cash-input').value) || 0;
   updatePendingCashUI(val); 
 
@@ -89,14 +92,33 @@ window.handleDepositedCashChange = function() {
 };
 
 window.updatePendingCashUI = function(inputVal = null) {
-  const key = currentFilterDate + "_" + (currentShiftFilter.replace(/\s+/g, ''));
+  const dateStr = currentFilterDate;
+  const shiftStr = currentShiftFilter.replace(/\s+/g, '');
+  const key = dateStr + "_" + shiftStr;
   
   let deposited = inputVal;
-  if (deposited === null) {
-     deposited = depositedCashData[key] || 0;
-     if ($('deposited-cash-input')) {
-        $('deposited-cash-input').value = deposited || '';
-     }
+
+  if (currentShiftFilter === 'All') {
+    // FULL DAY LOGIC: Sum of Before Lunch and After Lunch
+    const beforeVal = parseFloat(depositedCashData[dateStr + "_BeforeLunch"]) || 0;
+    const afterVal = parseFloat(depositedCashData[dateStr + "_AfterLunch"]) || 0;
+    deposited = beforeVal + afterVal;
+
+    if ($('deposited-cash-input')) {
+      $('deposited-cash-input').value = deposited || '';
+      $('deposited-cash-input').readOnly = true; // Lock field
+      $('deposited-cash-input').style.opacity = '0.6'; // Dim field to show it's locked
+    }
+  } else {
+    // SHIFT LOGIC: Normal input allowed
+    if (deposited === null) {
+       deposited = depositedCashData[key] || 0;
+    }
+    if ($('deposited-cash-input')) {
+       $('deposited-cash-input').value = deposited || '';
+       $('deposited-cash-input').readOnly = false; // Unlock field
+       $('deposited-cash-input').style.opacity = '1';
+    }
   }
   
   let pending = currentTotalCash - deposited;
@@ -476,7 +498,7 @@ window.handlePremiumFormSubmit = async function(event) {
     
     $('new-premium-order-form').reset(); 
     $('p-grand-total').textContent = '₹0'; $('p-subtotal').textContent = '₹0'; $('p-delivery-display').textContent = '₹0'; $('split-inputs').classList.add('hidden');
-    $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button></div>`;
+    $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button></div>`;
     premRestCount = 1;
     
     toggleModal(false);
@@ -650,7 +672,6 @@ function updateStats() {
   if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = countUniqueOrders(deliveredCashOrders);
   if ($('stat-delivered-cash-total')) $('stat-delivered-cash-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
-  // PENDING CASH UPDATE HOGA YAHAN
   currentTotalCash = cashTotal; 
   updatePendingCashUI();
 
@@ -690,7 +711,6 @@ function updateStats() {
           let html = '';
           for (let r in riderData) {
               let d = riderData[r];
-              // FIX: Payout is now perfectly based on Unique Orders!
               let payoutText = d.isSalary ? `<span class="text-xs font-semibold text-blue-400 mt-1">📊 On Salary</span>` : `<span class="text-xs font-bold text-green-400 mt-1">💰 Payout: ₹${d.uniqueOrders.size * PER_ORDER_RATE}</span>`;
               html += `<div class="flex justify-between items-start gap-4 mb-3 border-b border-slate-700/50 pb-2 last:border-0 last:pb-0"><div class="flex flex-col flex-1"><span class="font-medium text-slate-300 capitalize">${r}</span><span class="text-[10px] text-slate-500">${d.uniqueOrders.size} Orders | ${d.addresses.size} Addr</span>${payoutText}</div><div class="text-right"><span class="text-[10px] text-slate-500 block mb-0.5">Collected</span><span class="font-bold text-white">₹${d.amount.toFixed(2)}</span></div></div>`;
           }
