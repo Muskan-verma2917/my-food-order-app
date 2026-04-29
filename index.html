@@ -7,8 +7,7 @@
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-  
-  <link rel="stylesheet" href="style.css?v=100">
+  <link rel="stylesheet" href="style.css?v=105">
   <link rel="manifest" href="manifest.json">
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -158,7 +157,7 @@
          <th class="text-left px-4 py-3">
            <div class="flex flex-col sm:flex-row sm:items-center gap-1.5">
              Restaurant
-             <select id="filter-restaurant" onchange="filterData()" class="bg-[#1e212b] border border-slate-600 text-slate-300 text-[10px] rounded outline-none py-0.5 px-1 max-w-[100px] truncate">
+             <select id="filter-restaurant" onchange="filterData()" class="bg-[#1e212b] border border-slate-600 text-slate-300 text-[10px] rounded outline-none py-0.5 px-1 max-w-[100px] truncate cursor-pointer">
                <option value="All">All Rest.</option>
              </select>
            </div>
@@ -168,7 +167,7 @@
          <th class="text-left px-4 py-3">
            <div class="flex flex-col sm:flex-row sm:items-center gap-1.5">
              Rider
-             <select id="filter-rider" onchange="filterData()" class="bg-[#1e212b] border border-slate-600 text-slate-300 text-[10px] rounded outline-none py-0.5 px-1 max-w-[90px] truncate">
+             <select id="filter-rider" onchange="filterData()" class="bg-[#1e212b] border border-slate-600 text-slate-300 text-[10px] rounded outline-none py-0.5 px-1 max-w-[90px] truncate cursor-pointer">
                <option value="All">All Riders</option>
              </select>
            </div>
@@ -337,6 +336,6 @@
    </div>
   </div>
 
-  <script src="script.js?v=100"></script>
+  <script src="script.js?v=105"></script>
  </body>
 </html>

@@ -17,6 +17,8 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
+console.log("App Version 105 Loaded - Cache Cleared!"); // Taaki pata chal jaye ki naya code aa gaya
+
 // --- TIMEZONE DATE FIX ---
 function getLocalIsoDate() {
   const d = new Date();
@@ -30,9 +32,14 @@ let depositedCashData = {};
 let currentTotalCash = 0;   
 let cashSaveTimeout;        
 let editingMenuId = null; 
-let currentTableFilter = 'All'; 
+
+// FILTER VARIABLES
 let currentFilterDate = getLocalIsoDate(); 
 let currentShiftFilter = 'All'; 
+let currentTableFilter = 'All'; 
+let currentRestFilter = 'All'; 
+let currentRiderFilter = 'All';
+
 let orderCounter = 0;
 let pendingDelete = null;
 
@@ -76,9 +83,8 @@ dbDailyCash.on('value', (snapshot) => {
   updatePendingCashUI();
 });
 
-// --- PENDING CASH LOGIC (WITH AUTO-SUM FOR FULL DAY) ---
+// --- PENDING CASH LOGIC ---
 window.handleDepositedCashChange = function() {
-  // Agar "Full Day" select hai toh type karna allowed nahi hai
   if (currentShiftFilter === 'All') return; 
 
   const val = parseFloat($('deposited-cash-input').value) || 0;
@@ -97,31 +103,38 @@ window.updatePendingCashUI = function(inputVal = null) {
   const key = dateStr + "_" + shiftStr;
   
   let deposited = inputVal;
+  const inputEl = $('deposited-cash-input');
+  const labelEl = $('deposited-label');
 
   if (currentShiftFilter === 'All') {
-    // FULL DAY LOGIC: Sum of Before Lunch and After Lunch
     const beforeVal = parseFloat(depositedCashData[dateStr + "_BeforeLunch"]) || 0;
     const afterVal = parseFloat(depositedCashData[dateStr + "_AfterLunch"]) || 0;
     deposited = beforeVal + afterVal;
 
-    if ($('deposited-cash-input')) {
-      $('deposited-cash-input').value = deposited || '';
-      $('deposited-cash-input').readOnly = true; // Lock field
-      $('deposited-cash-input').style.opacity = '0.6'; // Dim field to show it's locked
+    if (inputEl && labelEl) {
+      inputEl.value = deposited || '';
+      inputEl.disabled = true; 
+      inputEl.parentElement.style.opacity = '0.5';
+      inputEl.parentElement.style.pointerEvents = 'none'; 
+      labelEl.textContent = 'Auto Sum (Both Shifts):'; 
+      labelEl.style.color = '#a855f7'; 
     }
   } else {
-    // SHIFT LOGIC: Normal input allowed
     if (deposited === null) {
        deposited = depositedCashData[key] || 0;
     }
-    if ($('deposited-cash-input')) {
-       $('deposited-cash-input').value = deposited || '';
-       $('deposited-cash-input').readOnly = false; // Unlock field
-       $('deposited-cash-input').style.opacity = '1';
+    if (inputEl && labelEl) {
+       inputEl.value = deposited || '';
+       inputEl.disabled = false;
+       inputEl.parentElement.style.opacity = '1';
+       inputEl.parentElement.style.pointerEvents = 'auto';
+       labelEl.textContent = 'Rider Deposited:';
+       labelEl.style.color = '#94a3b8'; 
     }
   }
   
-  let pending = currentTotalCash - deposited;
+  let numDeposited = parseFloat(deposited) || 0;
+  let pending = currentTotalCash - numDeposited;
   const display = $('pending-cash-display');
   if (!display) return;
   
@@ -413,6 +426,8 @@ function showToast(msg, type='success') {
 window.filterData = function() { 
   currentFilterDate = $('date-filter').value; 
   currentShiftFilter = $('shift-filter') ? $('shift-filter').value : 'All';
+  currentRestFilter = $('filter-restaurant') ? $('filter-restaurant').value : 'All';
+  currentRiderFilter = $('filter-rider') ? $('filter-rider').value : 'All';
   updateStats(); 
   renderOrders(); 
 }
@@ -498,7 +513,7 @@ window.handlePremiumFormSubmit = async function(event) {
     
     $('new-premium-order-form').reset(); 
     $('p-grand-total').textContent = '₹0'; $('p-subtotal').textContent = '₹0'; $('p-delivery-display').textContent = '₹0'; $('split-inputs').classList.add('hidden');
-    $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button></div>`;
+    $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button></div>`;
     premRestCount = 1;
     
     toggleModal(false);
@@ -630,10 +645,53 @@ function countUniqueOrders(arr) {
 }
 
 function updateStats() {
-  const filteredData = allOrders.filter(o => {
+  const baseFilteredData = allOrders.filter(o => {
     const isDateMatch = o.date && o.date.slice(0, 10) === currentFilterDate;
     const isShiftMatch = currentShiftFilter === 'All' || o.shift === currentShiftFilter || (!o.shift && currentShiftFilter === 'All');
     return isDateMatch && isShiftMatch;
+  });
+
+  const rests = new Set();
+  const riders = new Set();
+  baseFilteredData.forEach(o => {
+      if(o.customer_name) rests.add(o.customer_name.trim());
+      if(o.rider) riders.add(o.rider.trim());
+  });
+
+  function populateSelect(id, set, currVal) {
+      const sel = $(id);
+      if(!sel) return currVal;
+      
+      sel.innerHTML = ''; 
+      const allOpt = document.createElement('option');
+      allOpt.value = 'All';
+      allOpt.textContent = id === 'filter-restaurant' ? 'All Rest.' : 'All Riders';
+      sel.appendChild(allOpt);
+
+      const sorted = Array.from(set).filter(Boolean).sort();
+      sorted.forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item;
+          opt.textContent = item;
+          sel.appendChild(opt);
+      });
+
+      if(sel.querySelector(`option[value="${currVal}"]`)) {
+          sel.value = currVal;
+          return currVal;
+      } else {
+          sel.value = 'All';
+          return 'All';
+      }
+  }
+
+  currentRestFilter = populateSelect('filter-restaurant', rests, currentRestFilter);
+  currentRiderFilter = populateSelect('filter-rider', riders, currentRiderFilter);
+
+  const filteredData = baseFilteredData.filter(o => {
+      const isRestMatch = currentRestFilter === 'All' || (o.customer_name || '').trim() === currentRestFilter;
+      const isRiderMatch = currentRiderFilter === 'All' || (o.rider || '').trim() === currentRiderFilter;
+      return isRestMatch && isRiderMatch;
   });
 
   let upiTotal = 0, cashTotal = 0, pendingTotal = 0, pureSales = 0, totalWithDelivery = 0;
@@ -745,7 +803,9 @@ function renderOrders() {
   const filtered = allOrders.filter(o => {
     const isDateMatch = o.date && o.date.slice(0, 10) === currentFilterDate;
     const isShiftMatch = currentShiftFilter === 'All' || o.shift === currentShiftFilter || (!o.shift && currentShiftFilter === 'All');
-    return isDateMatch && isShiftMatch;
+    const isRestMatch = currentRestFilter === 'All' || (o.customer_name || '').trim() === currentRestFilter;
+    const isRiderMatch = currentRiderFilter === 'All' || (o.rider || '').trim() === currentRiderFilter;
+    return isDateMatch && isShiftMatch && isRestMatch && isRiderMatch;
   }).filter(o => {
     if (currentTableFilter === 'All') return true;
     if (currentTableFilter === 'Delivered (Total)') return o.status === 'Delivered';
