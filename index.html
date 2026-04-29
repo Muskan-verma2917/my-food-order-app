@@ -87,7 +87,7 @@
       </div>
       <div class="mt-2 pt-3 border-t border-slate-700/50">
        <div class="flex items-center justify-between gap-1">
-        <span class="text-[11px] font-medium text-slate-400">Rider Deposited:</span>
+        <span class="text-[11px] font-medium text-slate-400" id="deposited-label">Rider Deposited:</span>
         <div class="flex items-center gap-1 bg-[#16181f] px-2 py-1 rounded border border-slate-700 w-24">
          <span class="text-[10px] text-slate-500">₹</span>
          <input type="number" id="deposited-cash-input" class="w-full bg-transparent text-[11px] sm:text-xs text-white outline-none" placeholder="0" oninput="handleDepositedCashChange()">
@@ -154,10 +154,24 @@
        <thead>
         <tr style="background:#12141d; color:#6b7084;" class="text-xs uppercase tracking-wider">
          <th class="text-left px-4 py-3">Order #</th>
-         <th class="text-left px-4 py-3">Restaurant</th>
+         <th class="text-left px-4 py-3">
+           <div class="flex flex-col sm:flex-row sm:items-center gap-1.5">
+             Restaurant
+             <select id="filter-restaurant" onchange="filterData()" class="bg-[#1e212b] border border-slate-600 text-slate-300 text-[10px] rounded outline-none py-0.5 px-1 max-w-[100px] truncate">
+               <option value="All">All Rest.</option>
+             </select>
+           </div>
+         </th>
          <th class="text-left px-4 py-3">Customer Info</th>
          <th class="text-left px-4 py-3">Order Details</th>
-         <th class="text-left px-4 py-3">Rider</th>
+         <th class="text-left px-4 py-3">
+           <div class="flex flex-col sm:flex-row sm:items-center gap-1.5">
+             Rider
+             <select id="filter-rider" onchange="filterData()" class="bg-[#1e212b] border border-slate-600 text-slate-300 text-[10px] rounded outline-none py-0.5 px-1 max-w-[90px] truncate">
+               <option value="All">All Riders</option>
+             </select>
+           </div>
+         </th>
          <th class="text-right px-4 py-3">Total Sale</th>
          <th class="text-center px-4 py-3">Status</th>
          <th class="text-center px-4 py-3">Actions</th>
