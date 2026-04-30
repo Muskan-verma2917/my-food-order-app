@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=400">
+  <link rel="stylesheet" href="style.css?v=200">
   <link rel="manifest" href="manifest.json">
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -15,7 +15,8 @@
 
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=400');
+      // Is baar sw.js ke aage version lagaya hai taaki wo purana wala delete ho jaye
+      navigator.serviceWorker.register('sw.js?v=200');
     }
   </script>
  </head>
@@ -29,7 +30,7 @@
     <div class="flex items-center gap-3 w-full lg:w-auto justify-center lg:justify-start">
      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:#e85d3a;"><i data-lucide="utensils" style="width:18px;height:18px;color:#fff;"></i></div>
      <h1 id="app-title" class="text-lg sm:text-xl font-bold flex items-center gap-2" style="font-family:'Playfair Display',serif;">
-       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v4.0</span>
+       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v2.0</span>
      </h1>
     </div>
     
@@ -59,24 +60,29 @@
    
    <main class="px-4 sm:px-8 py-6 max-w-7xl mx-auto w-full">
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+     <!-- 1. Sales -->
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-2 flex items-center gap-2"><i data-lucide="dollar-sign" style="width:14px;height:14px;"></i> Sales (INR)</div>
       <div id="stat-sales-inr" class="text-3xl font-bold" style="color: #ff5a36;">₹0</div>
      </div>
+     <!-- 2. Sales + Delivery -->
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-2 flex items-center gap-2"><i data-lucide="package" style="width:14px;height:14px;"></i> Sales + Delivery</div>
       <div id="stat-sales-delivery" class="text-3xl font-bold" style="color: #ff5a36;">₹0</div>
      </div>
+     <!-- 3. Total Orders -->
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-2 flex items-center gap-2"><i data-lucide="file-text" style="width:14px;height:14px;"></i> Total Orders</div>
       <div id="stat-total-orders" class="text-3xl font-bold" style="color: #f0ece4;">0</div>
      </div>
+     <!-- 4. Delivered (Total) -->
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-2"><i data-lucide="check-circle" style="width:14px;height:14px;"></i> Delivered (Total)</div>
       <div id="stat-delivered" class="text-3xl font-bold mb-2" style="color: #22c55e;">0</div>
       <div id="stat-delivered-total" class="text-lg font-semibold" style="color: #22c55e;">₹0.00</div>
       <p class="text-[10px] mt-1 text-slate-500">All Completed Orders</p>
      </div>
+     <!-- 5. Delivered (Cash) -->
      <div class="stat-card rounded-xl p-4 sm:p-5 flex flex-col justify-between" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div>
        <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-2 flex items-center gap-2"><i data-lucide="banknote" style="width:14px;height:14px;"></i> Delivered (Cash)</div>
@@ -98,18 +104,21 @@
        <div id="pending-cash-display" class="text-right text-[11px] font-bold mt-1.5" style="min-height: 16px;"></div>
       </div>
      </div>
+     <!-- 6. Delivered (UPI) -->
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-2"><i data-lucide="credit-card" style="width:14px;height:14px;"></i> Delivered (UPI)</div>
       <div id="stat-delivered-upi" class="text-3xl font-bold mb-2" style="color: #3b82f6;">0</div>
       <div id="stat-delivered-upi-total" class="text-lg font-semibold" style="color: #3b82f6;">₹0.00</div>
       <p class="text-[10px] mt-1 text-slate-500">Bank Received</p>
      </div>
+     <!-- 7. Pending Orders -->
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-2"><i data-lucide="clock" style="width:14px;height:14px;"></i> Payment Pending</div>
       <div id="stat-payment-pending" class="text-3xl font-bold mb-2" style="color: #f59e0b;">0</div>
       <div id="stat-payment-pending-total" class="text-lg font-semibold" style="color: #f59e0b;">₹0.00</div>
       <p class="text-[10px] mt-1 text-slate-500">Total Pending</p>
      </div>
+     <!-- 8. Active Riders -->
      <div class="stat-card rounded-xl p-5 relative group" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center justify-between gap-2">
        <div class="flex items-center gap-2"><i data-lucide="bike" style="width:14px;height:14px;"></i> Active Riders</div>
@@ -126,6 +135,7 @@
        </div>
       </div>
      </div>
+     <!-- 9. Restaurants -->
      <div class="stat-card rounded-xl p-5 relative group cursor-help" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-2"><i data-lucide="store" style="width:14px;height:14px;"></i> Restaurants</div>
       <div id="stat-rest-count" class="text-3xl font-bold mb-2" style="color: #f43f5e;">0</div>
@@ -189,6 +199,7 @@
    </main>
   </div>
 
+  <!-- MENU MASTER MODAL -->
   <div id="menu-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
     <div class="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl" style="background:#181a24; border:1px solid #1e2030;">
       <button onclick="toggleMenuModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl z-10">✕</button>
@@ -219,6 +230,7 @@
     </div>
   </div>
 
+  <!-- NAYA SMART EDIT ORDER MODAL (FULL ORDER EDIT) -->
   <div id="edit-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
    <div class="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 shadow-2xl" style="background:#181a24; border:1px solid #1e2030;">
     <button type="button" onclick="toggleEditModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl">✕</button>
@@ -227,6 +239,7 @@
     </h2>
     <form id="edit-order-form">
      
+     <!-- Yahan par saare restaurant aur items ke box aayenge -->
      <div id="edit-restaurants-wrapper" class="space-y-6"></div>
      
      <button type="button" onclick="addEditRestaurant()" class="w-full mt-4 py-2.5 border border-dashed border-slate-600 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:border-slate-500">+ Add Another Restaurant to this Order</button>
@@ -273,6 +286,7 @@
    </div>
   </div>
 
+  <!-- NEW ORDER MODAL -->
   <div id="form-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
    <div class="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 shadow-2xl" style="background:#181a24; border:1px solid #1e2030;"><button type="button" onclick="toggleModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl">✕</button>
     <h2 class="text-xl font-bold mb-6" style="color:#f0ece4; font-family:'Playfair Display',serif;">Create New Order</h2>
@@ -309,7 +323,6 @@
           <option value="After Lunch">🌙 After Lunch</option> 
         </select>
       </div>
-
      </div>
      <div class="space-y-2 bg-[#16181f] p-4 rounded-lg border border-slate-700 mb-6">
       <div class="flex items-center justify-between"><span class="text-slate-400 font-medium">Subtotal (Items):</span> <span id="p-subtotal" class="font-semibold" style="color:#cbd5e1;">₹0</span></div>
@@ -321,6 +334,6 @@
    </div>
   </div>
 
-  <script src="script.js?v=400"></script>
+  <script src="script.js?v=200"></script>
  </body>
 </html>

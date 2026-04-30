@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 3.0 Loaded! Old Modal Removed.");
+console.log("App Version 5.0 Loaded! Showing ALL TIME DATA by default.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -23,13 +23,16 @@ function getLocalIsoDate() {
 
 let allOrders = [], menuList = [], depositedCashData = {}, currentTotalCash = 0, cashSaveTimeout, editingMenuId = null; 
 let currentlyEditingOrderId = null, originalOrderItems = [], editRestCount = 0;
-let currentFilterDate = getLocalIsoDate(), currentShiftFilter = 'All', currentTableFilter = 'All', currentRestFilter = 'All', currentRiderFilter = 'All';
+
+// YAHAN FIX HAI: Ab app khulte hi kisi date ka nahi, balki saara data dikhayegi!
+let currentFilterDate = ''; 
+let currentShiftFilter = 'All', currentTableFilter = 'All', currentRestFilter = 'All', currentRiderFilter = 'All';
 let orderCounter = 0, pendingDelete = null;
 
 const defaultConfig = { app_title: 'Daily Delivery Sales', background_color: '#0f1117', primary_action_color: '#e85d3a' };
 const $ = id => document.getElementById(id);
 
-if ($('date-filter')) $('date-filter').value = currentFilterDate;
+if ($('date-filter')) $('date-filter').value = '';
 
 dbOrders.on('value', (snapshot) => {
   const data = snapshot.val(); allOrders = [];
@@ -45,7 +48,7 @@ dbMenu.on('value', (snapshot) => {
 dbDailyCash.on('value', (snapshot) => { depositedCashData = snapshot.val() || {}; updatePendingCashUI(); });
 
 window.handleDepositedCashChange = function() {
-  if (currentShiftFilter === 'All') return; 
+  if (!currentFilterDate || currentShiftFilter === 'All') return; 
   const val = parseFloat($('deposited-cash-input').value) || 0;
   updatePendingCashUI(val); 
   clearTimeout(cashSaveTimeout);
@@ -53,9 +56,20 @@ window.handleDepositedCashChange = function() {
 };
 
 window.updatePendingCashUI = function(inputVal = null) {
+  const inputEl = $('deposited-cash-input'), labelEl = $('deposited-label'), display = $('pending-cash-display');
+  
+  if (!currentFilterDate) {
+      if (inputEl && labelEl) {
+         inputEl.value = ''; inputEl.disabled = true; inputEl.parentElement.style.opacity = '0.5';
+         labelEl.textContent = 'Select Date for Cash:'; labelEl.style.color = '#94a3b8';
+      }
+      if (display) display.textContent = '';
+      return;
+  }
+
   const dateStr = currentFilterDate, shiftStr = currentShiftFilter.replace(/\s+/g, ''), key = dateStr + "_" + shiftStr;
   let deposited = inputVal;
-  const inputEl = $('deposited-cash-input'), labelEl = $('deposited-label');
+
   if (currentShiftFilter === 'All') {
     const beforeVal = parseFloat(depositedCashData[dateStr + "_BeforeLunch"]) || 0, afterVal = parseFloat(depositedCashData[dateStr + "_AfterLunch"]) || 0;
     deposited = beforeVal + afterVal;
@@ -64,8 +78,8 @@ window.updatePendingCashUI = function(inputVal = null) {
     if (deposited === null) { deposited = depositedCashData[key] || 0; }
     if (inputEl && labelEl) { inputEl.value = deposited || ''; inputEl.disabled = false; inputEl.parentElement.style.opacity = '1'; inputEl.parentElement.style.pointerEvents = 'auto'; labelEl.textContent = 'Rider Deposited:'; labelEl.style.color = '#94a3b8'; }
   }
+  
   let numDeposited = parseFloat(deposited) || 0, pending = currentTotalCash - numDeposited;
-  const display = $('pending-cash-display');
   if (!display) return;
   if (pending > 0) { display.textContent = `⚠️ Pending: ₹${pending.toFixed(2)}`; display.style.color = '#ef4444'; } 
   else if (pending < 0) { display.textContent = `⚠️ Extra: ₹${Math.abs(pending).toFixed(2)}`; display.style.color = '#f59e0b'; } 
@@ -261,15 +275,24 @@ window.filterData = function() { currentFilterDate = $('date-filter').value; cur
 function countUniqueOrders(arr) { let s = new Set(); arr.forEach(o => s.add(o.order_id || o.__backendId)); return s.size; }
 
 function updateStats() {
-  const baseFilteredData = allOrders.filter(o => { const isDateMatch = o.date && o.date.slice(0, 10) === currentFilterDate; const isShiftMatch = currentShiftFilter === 'All' || o.shift === currentShiftFilter || (!o.shift && currentShiftFilter === 'All'); return isDateMatch && isShiftMatch; });
+  const baseFilteredData = allOrders.filter(o => { 
+      const isDateMatch = !currentFilterDate || (o.date && o.date.slice(0, 10) === currentFilterDate); 
+      const isShiftMatch = currentShiftFilter === 'All' || o.shift === currentShiftFilter || (!o.shift && currentShiftFilter === 'All'); 
+      return isDateMatch && isShiftMatch; 
+  });
+
   const rests = new Set(), riders = new Set();
   baseFilteredData.forEach(o => { if(o.customer_name) rests.add(o.customer_name.trim()); if(o.rider) riders.add(o.rider.trim()); });
 
   function populateSelect(id, set, currVal) {
       const sel = $(id); if(!sel) return currVal; sel.innerHTML = ''; 
       const allOpt = document.createElement('option'); allOpt.value = 'All'; allOpt.textContent = id === 'filter-restaurant' ? 'All Rest.' : 'All Riders'; sel.appendChild(allOpt);
-      Array.from(set).filter(Boolean).sort().forEach(item => { const opt = document.createElement('option'); opt.value = item; opt.textContent = item; sel.appendChild(opt); });
-      if(sel.querySelector(`option[value="${currVal}"]`)) { sel.value = currVal; return currVal; } else { sel.value = 'All'; return 'All'; }
+      let found = false;
+      Array.from(set).filter(Boolean).sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'})).forEach(item => { 
+          const opt = document.createElement('option'); opt.value = item; opt.textContent = item; sel.appendChild(opt); 
+          if(item === currVal) found = true;
+      });
+      if(found) { sel.value = currVal; return currVal; } else { sel.value = 'All'; return 'All'; }
   }
   currentRestFilter = populateSelect('filter-restaurant', rests, currentRestFilter); currentRiderFilter = populateSelect('filter-rider', riders, currentRiderFilter);
 
@@ -325,7 +348,7 @@ function updateStats() {
 function renderOrders() {
   const tbody = $('orders-body');
   const filtered = allOrders.filter(o => {
-    const isDateMatch = o.date && o.date.slice(0, 10) === currentFilterDate;
+    const isDateMatch = !currentFilterDate || (o.date && o.date.slice(0, 10) === currentFilterDate);
     const isShiftMatch = currentShiftFilter === 'All' || o.shift === currentShiftFilter || (!o.shift && currentShiftFilter === 'All');
     const isRestMatch = currentRestFilter === 'All' || (o.customer_name || '').trim() === currentRestFilter;
     const isRiderMatch = currentRiderFilter === 'All' || (o.rider || '').trim() === currentRiderFilter;
@@ -362,4 +385,20 @@ function createRow(order) {
     <td class="px-4 py-3 text-center">
       <select onchange="changeStatus('${order.__backendId}', this.value)" class="bg-transparent border rounded px-2 py-1 outline-none text-xs font-semibold cursor-pointer" style="border-color:${statusColor}; color:${statusColor};">
         <option value="Payment Pending" ${order.payment_status === 'Payment Pending' ? 'selected' : ''} style="color:#f59e0b; background:#181a24;">Payment Pending</option>
-        <option value="Cash" ${order.payment_status === 'Cash' ? 'selected' : ''} style="color:#10b981; background:#181a24;">Delivered
+        <option value="Cash" ${order.payment_status === 'Cash' ? 'selected' : ''} style="color:#10b981; background:#181a24;">Delivered (Cash)</option>
+        <option value="UPI Done" ${order.payment_status === 'UPI Done' ? 'selected' : ''} style="color:#3b82f6; background:#181a24;">Delivered (UPI)</option>
+        ${(order.payment_status || '').includes('Split') ? `<option value="${esc(order.payment_status)}" selected style="color:#a855f7; background:#181a24;">Delivered (Split)</option>` : ''}
+      </select>
+    </td>
+    <td class="px-4 py-3 text-center">
+      ${isConfirming ? `<div class="flex items-center justify-center gap-1"><button onclick="confirmDelete('${order.__backendId}')" class="rounded px-2 py-1 text-xs" style="background:#dc2626;color:#fff;">Confirm</button><button onclick="cancelDelete()" class="rounded px-2 py-1 text-xs" style="background:#2a2d3e;color:#6b7084;">Cancel</button></div>` : `<div class="flex items-center justify-center gap-3"><button onclick="openEditModal('${order.__backendId}')" class="rounded hover:bg-blue-500/20 p-1.5" style="color:#60a5fa;">✏️</button><button onclick="requestDelete('${order.__backendId}')" class="rounded hover:bg-red-500/20 p-1.5" style="color:#ef4444;">🗑️</button></div>`}
+    </td>
+  `;
+  return tr;
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => { currentTableFilter = btn.dataset.filter; document.querySelectorAll('.filter-btn').forEach(b => { b.style.background = '#2a2d3e'; b.style.color = '#6b7084'; }); btn.style.background = defaultConfig.primary_action_color; btn.style.color = '#fff'; renderOrders(); });
+});
