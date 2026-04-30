@@ -15,9 +15,6 @@ const database = firebase.database();
 const dbOrders = database.ref('orders');
 const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
-const dbDailyCash = database.ref('daily_cash'); 
-
-console.log("App Version 105 Loaded - Cache Cleared!"); // Taaki pata chal jaye ki naya code aa gaya
 
 // --- TIMEZONE DATE FIX ---
 function getLocalIsoDate() {
@@ -28,18 +25,10 @@ function getLocalIsoDate() {
 
 let allOrders = [];
 let menuList = []; 
-let depositedCashData = {}; 
-let currentTotalCash = 0;   
-let cashSaveTimeout;        
 let editingMenuId = null; 
-
-// FILTER VARIABLES
+let currentTableFilter = 'All'; 
 let currentFilterDate = getLocalIsoDate(); 
 let currentShiftFilter = 'All'; 
-let currentTableFilter = 'All'; 
-let currentRestFilter = 'All'; 
-let currentRiderFilter = 'All';
-
 let orderCounter = 0;
 let pendingDelete = null;
 
@@ -77,81 +66,6 @@ dbMenu.on('value', (snapshot) => {
   }
   renderMenuTable();
 });
-
-dbDailyCash.on('value', (snapshot) => {
-  depositedCashData = snapshot.val() || {};
-  updatePendingCashUI();
-});
-
-// --- PENDING CASH LOGIC ---
-window.handleDepositedCashChange = function() {
-  if (currentShiftFilter === 'All') return; 
-
-  const val = parseFloat($('deposited-cash-input').value) || 0;
-  updatePendingCashUI(val); 
-
-  clearTimeout(cashSaveTimeout);
-  cashSaveTimeout = setTimeout(() => {
-    const key = currentFilterDate + "_" + (currentShiftFilter.replace(/\s+/g, '')); 
-    dbDailyCash.child(key).set(val);
-  }, 800);
-};
-
-window.updatePendingCashUI = function(inputVal = null) {
-  const dateStr = currentFilterDate;
-  const shiftStr = currentShiftFilter.replace(/\s+/g, '');
-  const key = dateStr + "_" + shiftStr;
-  
-  let deposited = inputVal;
-  const inputEl = $('deposited-cash-input');
-  const labelEl = $('deposited-label');
-
-  if (currentShiftFilter === 'All') {
-    const beforeVal = parseFloat(depositedCashData[dateStr + "_BeforeLunch"]) || 0;
-    const afterVal = parseFloat(depositedCashData[dateStr + "_AfterLunch"]) || 0;
-    deposited = beforeVal + afterVal;
-
-    if (inputEl && labelEl) {
-      inputEl.value = deposited || '';
-      inputEl.disabled = true; 
-      inputEl.parentElement.style.opacity = '0.5';
-      inputEl.parentElement.style.pointerEvents = 'none'; 
-      labelEl.textContent = 'Auto Sum (Both Shifts):'; 
-      labelEl.style.color = '#a855f7'; 
-    }
-  } else {
-    if (deposited === null) {
-       deposited = depositedCashData[key] || 0;
-    }
-    if (inputEl && labelEl) {
-       inputEl.value = deposited || '';
-       inputEl.disabled = false;
-       inputEl.parentElement.style.opacity = '1';
-       inputEl.parentElement.style.pointerEvents = 'auto';
-       labelEl.textContent = 'Rider Deposited:';
-       labelEl.style.color = '#94a3b8'; 
-    }
-  }
-  
-  let numDeposited = parseFloat(deposited) || 0;
-  let pending = currentTotalCash - numDeposited;
-  const display = $('pending-cash-display');
-  if (!display) return;
-  
-  if (pending > 0) {
-     display.textContent = `⚠️ Pending: ₹${pending.toFixed(2)}`;
-     display.style.color = '#ef4444'; 
-  } else if (pending < 0) {
-     display.textContent = `⚠️ Extra: ₹${Math.abs(pending).toFixed(2)}`;
-     display.style.color = '#f59e0b'; 
-  } else if (currentTotalCash > 0 && pending === 0) {
-     display.textContent = `✅ Clear: ₹0.00`;
-     display.style.color = '#10b981'; 
-  } else {
-     display.textContent = ''; 
-  }
-};
-
 
 // --- UI FUNCTIONS ---
 window.toggleModal = function(show) {
@@ -193,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
   $('edit-delivery')?.addEventListener('input', updateEditTotal);
 });
 
-// --- MENU MASTER LOGIC ---
+// --- MENU MASTER LOGIC (FORM WILL NOT CLOSE ON SAVE) ---
 window.handleMenuSubmit = async function() {
   const rest = $('menu-rest-input').value.trim();
   const item = $('menu-item-input').value.trim();
@@ -210,21 +124,13 @@ window.handleMenuSubmit = async function() {
       await dbMenu.child(editingMenuId).update({ restaurant: rest, item: item, rate: rate });
       showToast(`✅ ${item} updated successfully!`);
       cancelMenuEdit(); 
+      // Form band nahi hoga
     } else {
-      const isDuplicate = menuList.some(m => 
-        m.restaurant.toLowerCase() === rest.toLowerCase() && 
-        m.item.toLowerCase() === item.toLowerCase()
-      );
-
-      if (isDuplicate) {
-        showToast(`⚠️ ${item} is already added for ${rest}!`, 'error');
-        return; 
-      }
-
       const newItemRef = dbMenu.push();
       await newItemRef.set({ restaurant: rest, item: item, rate: rate });
       showToast(`✅ ${item} added to Menu!`);
       cancelMenuEdit();
+      // Form band nahi hoga
     }
   } catch (err) {
     showToast('Error saving menu: ' + err.message, 'error');
@@ -272,27 +178,12 @@ window.renderMenuTable = function() {
   const tbody = $('menu-list-body');
   if(!tbody) return;
   tbody.innerHTML = '';
-  
-  const searchInput = $('menu-search-input');
-  const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
-
-  const filteredMenu = menuList.filter(m => {
-    if (!searchTerm) return true;
-    const restMatch = (m.restaurant || '').toLowerCase().includes(searchTerm);
-    const itemMatch = (m.item || '').toLowerCase().includes(searchTerm);
-    return restMatch || itemMatch;
-  });
-
-  if(filteredMenu.length === 0) {
-    if (searchTerm) {
-      tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-500">No matching items found for "${esc(searchTerm)}".</td></tr>`;
-    } else {
-      tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-500">Menu is empty. Add your first item above!</td></tr>`;
-    }
+  if(menuList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-500">Menu is empty. Add your first item above!</td></tr>`;
     return;
   }
   
-  let sortedMenu = [...filteredMenu].sort((a,b) => a.restaurant.localeCompare(b.restaurant) || a.item.localeCompare(b.item));
+  let sortedMenu = [...menuList].sort((a,b) => a.restaurant.localeCompare(b.restaurant) || a.item.localeCompare(b.item));
 
   sortedMenu.forEach(m => {
     let displayRate = parseFloat(String(m.rate).replace(/[^\d.-]/g, ''));
@@ -426,13 +317,11 @@ function showToast(msg, type='success') {
 window.filterData = function() { 
   currentFilterDate = $('date-filter').value; 
   currentShiftFilter = $('shift-filter') ? $('shift-filter').value : 'All';
-  currentRestFilter = $('filter-restaurant') ? $('filter-restaurant').value : 'All';
-  currentRiderFilter = $('filter-rider') ? $('filter-rider').value : 'All';
   updateStats(); 
   renderOrders(); 
 }
 
-// --- FIREBASE SUBMIT LOGIC ---
+// --- FIREBASE SUBMIT LOGIC (INSTANT CLOSE) ---
 window.handlePremiumFormSubmit = async function(event) {
   if (event) event.preventDefault();
   const btn = $('place-order-btn');
@@ -516,6 +405,7 @@ window.handlePremiumFormSubmit = async function(event) {
     $('restaurants-wrapper').innerHTML = `<div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1"><div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Enter restaurant name" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="items-rest-1"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="Item Name" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="0" min="0" oninput="calcPremiumTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="1" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500 transition-colors" onclick="removePremiumItem(this)">✕</button></div></div><button type="button" onclick="addPremiumItem(${premRestCount})" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button></div>`;
     premRestCount = 1;
     
+    // INSTANT CLOSE NEW ORDER MODAL
     toggleModal(false);
 
   } catch (err) {
@@ -564,7 +454,7 @@ window.confirmDelete = async function(backendId) {
   showToast('Order deleted from Cloud');
 };
 
-// --- FIREBASE EDIT LOGIC ---
+// --- FIREBASE EDIT LOGIC (INSTANT CLOSE) ---
 let editingOrderId = null;
 window.openEditModal = function(backendId) {
   editingOrderId = backendId;
@@ -624,6 +514,7 @@ window.handleEditSubmit = async function(event) {
     await dbOrders.child(editingOrderId).update(updatedData);
     showToast('✅ Order updated in Cloud!'); 
     
+    // INSTANT CLOSE EDIT MODAL
     toggleEditModal(false); 
 
   } catch (err) { 
@@ -645,53 +536,10 @@ function countUniqueOrders(arr) {
 }
 
 function updateStats() {
-  const baseFilteredData = allOrders.filter(o => {
+  const filteredData = allOrders.filter(o => {
     const isDateMatch = o.date && o.date.slice(0, 10) === currentFilterDate;
     const isShiftMatch = currentShiftFilter === 'All' || o.shift === currentShiftFilter || (!o.shift && currentShiftFilter === 'All');
     return isDateMatch && isShiftMatch;
-  });
-
-  const rests = new Set();
-  const riders = new Set();
-  baseFilteredData.forEach(o => {
-      if(o.customer_name) rests.add(o.customer_name.trim());
-      if(o.rider) riders.add(o.rider.trim());
-  });
-
-  function populateSelect(id, set, currVal) {
-      const sel = $(id);
-      if(!sel) return currVal;
-      
-      sel.innerHTML = ''; 
-      const allOpt = document.createElement('option');
-      allOpt.value = 'All';
-      allOpt.textContent = id === 'filter-restaurant' ? 'All Rest.' : 'All Riders';
-      sel.appendChild(allOpt);
-
-      const sorted = Array.from(set).filter(Boolean).sort();
-      sorted.forEach(item => {
-          const opt = document.createElement('option');
-          opt.value = item;
-          opt.textContent = item;
-          sel.appendChild(opt);
-      });
-
-      if(sel.querySelector(`option[value="${currVal}"]`)) {
-          sel.value = currVal;
-          return currVal;
-      } else {
-          sel.value = 'All';
-          return 'All';
-      }
-  }
-
-  currentRestFilter = populateSelect('filter-restaurant', rests, currentRestFilter);
-  currentRiderFilter = populateSelect('filter-rider', riders, currentRiderFilter);
-
-  const filteredData = baseFilteredData.filter(o => {
-      const isRestMatch = currentRestFilter === 'All' || (o.customer_name || '').trim() === currentRestFilter;
-      const isRiderMatch = currentRiderFilter === 'All' || (o.rider || '').trim() === currentRiderFilter;
-      return isRestMatch && isRiderMatch;
   });
 
   let upiTotal = 0, cashTotal = 0, pendingTotal = 0, pureSales = 0, totalWithDelivery = 0;
@@ -730,9 +578,6 @@ function updateStats() {
   if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = countUniqueOrders(deliveredCashOrders);
   if ($('stat-delivered-cash-total')) $('stat-delivered-cash-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
-  currentTotalCash = cashTotal; 
-  updatePendingCashUI();
-
   if ($('stat-delivered-upi')) $('stat-delivered-upi').textContent = countUniqueOrders(deliveredUpiOrders);
   if ($('stat-delivered-upi-total')) $('stat-delivered-upi-total').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
@@ -769,7 +614,7 @@ function updateStats() {
           let html = '';
           for (let r in riderData) {
               let d = riderData[r];
-              let payoutText = d.isSalary ? `<span class="text-xs font-semibold text-blue-400 mt-1">📊 On Salary</span>` : `<span class="text-xs font-bold text-green-400 mt-1">💰 Payout: ₹${d.uniqueOrders.size * PER_ORDER_RATE}</span>`;
+              let payoutText = d.isSalary ? `<span class="text-xs font-semibold text-blue-400 mt-1">📊 On Salary</span>` : `<span class="text-xs font-bold text-green-400 mt-1">💰 Payout: ₹${d.addresses.size * PER_ORDER_RATE}</span>`;
               html += `<div class="flex justify-between items-start gap-4 mb-3 border-b border-slate-700/50 pb-2 last:border-0 last:pb-0"><div class="flex flex-col flex-1"><span class="font-medium text-slate-300 capitalize">${r}</span><span class="text-[10px] text-slate-500">${d.uniqueOrders.size} Orders | ${d.addresses.size} Addr</span>${payoutText}</div><div class="text-right"><span class="text-[10px] text-slate-500 block mb-0.5">Collected</span><span class="font-bold text-white">₹${d.amount.toFixed(2)}</span></div></div>`;
           }
           $('rider-breakdown-content').innerHTML = html;
@@ -803,9 +648,7 @@ function renderOrders() {
   const filtered = allOrders.filter(o => {
     const isDateMatch = o.date && o.date.slice(0, 10) === currentFilterDate;
     const isShiftMatch = currentShiftFilter === 'All' || o.shift === currentShiftFilter || (!o.shift && currentShiftFilter === 'All');
-    const isRestMatch = currentRestFilter === 'All' || (o.customer_name || '').trim() === currentRestFilter;
-    const isRiderMatch = currentRiderFilter === 'All' || (o.rider || '').trim() === currentRiderFilter;
-    return isDateMatch && isShiftMatch && isRestMatch && isRiderMatch;
+    return isDateMatch && isShiftMatch;
   }).filter(o => {
     if (currentTableFilter === 'All') return true;
     if (currentTableFilter === 'Delivered (Total)') return o.status === 'Delivered';
