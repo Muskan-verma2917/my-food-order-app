@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=300">
   <link rel="manifest" href="manifest.json">
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -15,7 +15,7 @@
 
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js');
+      navigator.serviceWorker.register('sw.js?v=300');
     }
   </script>
  </head>
@@ -28,7 +28,9 @@
    <header class="sticky top-0 z-40 px-4 sm:px-8 py-4 flex flex-col lg:flex-row items-center justify-between gap-4 shadow-md" style="background:rgba(15,17,23,0.95); backdrop-filter:blur(12px); border-bottom:1px solid #1e2030;">
     <div class="flex items-center gap-3 w-full lg:w-auto justify-center lg:justify-start">
      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:#e85d3a;"><i data-lucide="utensils" style="width:18px;height:18px;color:#fff;"></i></div>
-     <h1 id="app-title" class="text-lg sm:text-xl font-bold" style="font-family:'Playfair Display',serif;">Daily Delivery Sales</h1>
+     <h1 id="app-title" class="text-lg sm:text-xl font-bold flex items-center gap-2" style="font-family:'Playfair Display',serif;">
+       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v3.0</span>
+     </h1>
     </div>
     
     <div class="flex flex-wrap items-center justify-center gap-2 lg:gap-3 w-full lg:w-auto">
@@ -157,7 +159,7 @@
          <th class="text-left px-4 py-3">
            <div class="flex flex-col sm:flex-row sm:items-center gap-1.5">
              Restaurant
-             <select id="filter-restaurant" onchange="filterData()" class="bg-[#1e212b] border border-slate-600 text-slate-300 text-[10px] rounded outline-none py-0.5 px-1 max-w-[100px] truncate">
+             <select id="filter-restaurant" onchange="filterData()" class="bg-[#1e212b] border border-slate-600 text-slate-300 text-[10px] rounded outline-none py-0.5 px-1 max-w-[100px] truncate cursor-pointer">
                <option value="All">All Rest.</option>
              </select>
            </div>
@@ -167,7 +169,7 @@
          <th class="text-left px-4 py-3">
            <div class="flex flex-col sm:flex-row sm:items-center gap-1.5">
              Rider
-             <select id="filter-rider" onchange="filterData()" class="bg-[#1e212b] border border-slate-600 text-slate-300 text-[10px] rounded outline-none py-0.5 px-1 max-w-[90px] truncate">
+             <select id="filter-rider" onchange="filterData()" class="bg-[#1e212b] border border-slate-600 text-slate-300 text-[10px] rounded outline-none py-0.5 px-1 max-w-[90px] truncate cursor-pointer">
                <option value="All">All Riders</option>
              </select>
            </div>
@@ -196,93 +198,76 @@
         </h2>
         <p class="text-xs text-slate-400 mt-1">Add or Update items here to Auto-fill rates in the order form.</p>
       </div>
-      
       <div class="p-6 overflow-y-auto flex-1">
         <div class="bg-[#16181f] p-4 rounded-xl border border-slate-700 mb-6 relative">
           <h3 id="menu-form-title" class="text-sm font-semibold mb-3 text-slate-300">Add New Menu Item</h3>
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-            <div class="md:col-span-3">
-              <label class="block text-[10px] text-slate-500 mb-1">Restaurant</label>
-              <input type="text" id="menu-rest-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="e.g. Banke">
-            </div>
-            <div class="md:col-span-5">
-              <label class="block text-[10px] text-slate-500 mb-1">Item Name</label>
-              <input type="text" id="menu-item-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="e.g. 1/2 shahi paneer">
-            </div>
-            <div class="md:col-span-4">
-              <label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label>
+            <div class="md:col-span-3"><label class="block text-[10px] text-slate-500 mb-1">Restaurant</label><input type="text" id="menu-rest-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
+            <div class="md:col-span-5"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" id="menu-item-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
+            <div class="md:col-span-4"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label>
               <div class="flex gap-2">
-                <input type="number" id="menu-rate-input" class="flex-1 min-w-[80px] bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" placeholder="100">
+                <input type="number" id="menu-rate-input" class="flex-1 min-w-[80px] bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none">
                 <button type="button" id="menu-save-btn" onclick="handleMenuSubmit()" class="px-4 rounded-lg font-bold text-white transition hover:opacity-90 whitespace-nowrap shrink-0" style="background:#ff5a36;">Add</button>
-                <button type="button" id="menu-cancel-btn" onclick="cancelMenuEdit()" class="hidden px-3 rounded-lg font-bold text-slate-400 bg-slate-700 hover:text-white transition shrink-0" title="Cancel Edit">✕</button>
+                <button type="button" id="menu-cancel-btn" onclick="cancelMenuEdit()" class="hidden px-3 rounded-lg font-bold text-slate-400 bg-slate-700 hover:text-white transition shrink-0">✕</button>
               </div>
             </div>
           </div>
         </div>
-
-        <div class="mb-3">
-          <div class="relative">
-            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
-            </div>
-            <input type="text" id="menu-search-input" class="w-full bg-[#16181f] border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-slate-200 focus:border-[#ff5a36] outline-none transition-colors" placeholder="Search by Restaurant or Item Name..." oninput="renderMenuTable()">
-          </div>
-        </div>
-
-        <div class="border border-slate-700 rounded-xl overflow-hidden">
-          <table class="w-full text-sm text-left">
-            <thead class="bg-[#12141d] text-xs uppercase text-slate-500 tracking-wider">
-              <tr>
-                <th class="px-4 py-3">Restaurant</th>
-                <th class="px-4 py-3">Item Name</th>
-                <th class="px-4 py-3 text-right">Rate (₹)</th>
-                <th class="px-4 py-3 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody id="menu-list-body" class="divide-y divide-slate-700/50">
-              </tbody>
-          </table>
-        </div>
+        <div class="mb-3"><div class="relative"><div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"><i data-lucide="search" class="w-4 h-4 text-slate-400"></i></div><input type="text" id="menu-search-input" class="w-full bg-[#16181f] border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-slate-200 focus:border-[#ff5a36] outline-none transition-colors" placeholder="Search by Restaurant or Item Name..." oninput="renderMenuTable()"></div></div>
+        <div class="border border-slate-700 rounded-xl overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-[#12141d] text-xs uppercase text-slate-500 tracking-wider"><tr><th class="px-4 py-3">Restaurant</th><th class="px-4 py-3">Item Name</th><th class="px-4 py-3 text-right">Rate (₹)</th><th class="px-4 py-3 text-center">Action</th></tr></thead><tbody id="menu-list-body" class="divide-y divide-slate-700/50"></tbody></table></div>
       </div>
     </div>
   </div>
 
   <div id="edit-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-   <div class="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 shadow-2xl" style="background:#181a24; border:1px solid #1e2030;"><button type="button" onclick="toggleEditModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl">✕</button>
-    <h2 class="text-xl font-bold mb-6" style="color:#f0ece4; font-family:'Playfair Display',serif;">Edit Order</h2>
+   <div class="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 shadow-2xl" style="background:#181a24; border:1px solid #1e2030;">
+    <button type="button" onclick="toggleEditModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl">✕</button>
+    <h2 class="text-xl font-bold mb-6 flex items-center gap-2" style="color:#f0ece4; font-family:'Playfair Display',serif;">
+      Edit Full Order <span id="edit-order-id-display" class="text-[#ff5a36] text-lg"></span>
+    </h2>
     <form id="edit-order-form">
-     <div class="space-y-4 mb-6">
-      <div><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name</label> <input type="text" id="edit-restaurant" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200" oninput="autoFillEditRate()"></div>
-      <div><label class="block text-xs font-medium text-slate-400 mb-1">Item Name</label> <input type="text" id="edit-item-name" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200" oninput="autoFillEditRate()"></div>
-      <div class="grid grid-cols-3 gap-3">
-       <div><label class="block text-xs font-medium text-slate-400 mb-1">Rate (₹)</label> <input type="number" id="edit-rate" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200" min="0"></div>
-       <div><label class="block text-xs font-medium text-slate-400 mb-1">Quantity</label> <input type="number" id="edit-qty" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200" min="1"></div>
-       <div><label class="block text-xs font-medium text-slate-400 mb-1">Delivery Charge (₹)</label> <input type="number" id="edit-delivery" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200" min="0"></div>
-      </div>
-      
-      <div class="grid grid-cols-2 gap-4">
-        <div><label class="block text-xs font-medium text-slate-400 mb-1">Rider Name</label> <input type="text" id="edit-rider" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200"></div>
-        <div><label class="block text-xs font-medium text-slate-400 mb-1">Shift</label> 
-          <select id="edit-shift" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200" style="background-color:#1e212b;"> 
-            <option value="Before Lunch">☀️ Before Lunch</option> 
-            <option value="After Lunch">🌙 After Lunch</option> 
-          </select>
-        </div>
-      </div>
-      
-      <div><label class="block text-xs font-medium text-slate-400 mb-1">Customer Contact</label> <input type="text" id="edit-contact" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200"></div>
-      <div><label class="block text-xs font-medium text-slate-400 mb-1">Delivery Address</label> <textarea id="edit-address" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200" rows="2"></textarea></div>
-      <div><label class="block text-xs font-medium text-slate-400 mb-1">Payment Status</label> <select id="edit-payment-status" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200" style="background-color:#1e212b;" onchange="toggleEditSplitFields()"> <option value="UPI Done">UPI Done</option> <option value="Payment Pending">Payment Pending</option> <option value="Cash">Cash</option> <option value="Split">Split (Cash + UPI)</option> </select>
+     
+     <div id="edit-restaurants-wrapper" class="space-y-6"></div>
+     
+     <button type="button" onclick="addEditRestaurant()" class="w-full mt-4 py-2.5 border border-dashed border-slate-600 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:border-slate-500">+ Add Another Restaurant to this Order</button>
+     
+     <hr class="border-slate-700/50 my-6">
+     
+     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div><label class="block text-xs font-medium text-slate-400 mb-1">Delivery Charge (₹)</label> <input type="number" id="edit-del-charge" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" step="0.01" oninput="calcEditTotal()"></div>
+      <div><label class="block text-xs font-medium text-slate-400 mb-1">Payment Mode *</label> 
+        <select id="edit-payment-status" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" style="background-color: #1e212b;" onchange="toggleEditSplitFields()"> 
+          <option value="UPI Done">UPI Done</option> 
+          <option value="Payment Pending">Payment Pending</option> 
+          <option value="Cash">Cash</option> 
+          <option value="Split">Split (Cash + UPI)</option> 
+        </select>
        <div id="edit-split-inputs" class="hidden grid grid-cols-2 gap-2 mt-3">
         <div><label class="block text-[10px] text-slate-500 mb-1">Cash Amount</label> <input type="number" id="edit-split-cash" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200" placeholder="0"></div>
         <div><label class="block text-[10px] text-slate-500 mb-1">UPI Amount</label> <input type="number" id="edit-split-upi" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200" placeholder="0"></div>
        </div>
       </div>
+      <div><label class="block text-xs font-medium text-slate-400 mb-1">Customer Contact</label> <input type="text" id="edit-contact" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
+      <div class="md:col-span-2"><label class="block text-xs font-medium text-slate-400 mb-1">Delivery Address *</label> <input type="text" id="edit-address" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
+      
+      <div><label class="block text-xs font-medium text-slate-400 mb-1">Rider Name</label> <input type="text" id="edit-rider" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
+      <div><label class="block text-xs font-medium text-slate-400 mb-1">Shift *</label> 
+        <select id="edit-shift" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" style="background-color: #1e212b;"> 
+          <option value="Before Lunch">☀️ Before Lunch</option> 
+          <option value="After Lunch">🌙 After Lunch</option> 
+        </select>
+      </div>
      </div>
-     <div class="flex items-center justify-between bg-[#16181f] p-4 rounded-lg border border-slate-700 mb-6"><span class="text-slate-400 font-medium">Total Sale:</span> <span id="edit-total-display" class="text-2xl font-bold" style="color:#4ade80;">₹0</span></div>
+     
+     <div class="space-y-2 bg-[#16181f] p-4 rounded-lg border border-slate-700 mb-6">
+      <div class="flex items-center justify-between"><span class="text-slate-400 font-medium">Subtotal (Items):</span> <span id="edit-subtotal" class="font-semibold" style="color:#cbd5e1;">₹0</span></div>
+      <div class="flex items-center justify-between"><span class="text-slate-400 font-medium">Delivery Charge:</span> <span id="edit-delivery-display" class="font-semibold" style="color:#cbd5e1;">₹0</span></div>
+      <div class="border-t border-slate-600 pt-2 flex items-center justify-between"><span class="text-slate-300 font-bold">New Order Total:</span> <span id="edit-grand-total" class="text-2xl font-bold" style="color: #4ade80;">₹0</span></div>
+     </div>
+     
      <div class="flex gap-3">
-      <button type="button" id="edit-save-btn" onclick="handleEditSubmit(event)" class="flex-1 py-3 rounded-lg font-bold text-white shadow-lg" style="background-color:#ff5a36;">Save Changes</button> 
-      <button type="button" onclick="toggleEditModal(false)" class="flex-1 py-3 rounded-lg font-bold" style="background-color:#2a2d3e; color:#6b7084;">Cancel</button>
+      <button type="button" id="edit-save-btn" onclick="handleFullEditSubmit(event)" class="flex-1 py-3.5 rounded-lg font-bold text-white shadow-lg" style="background-color:#ff5a36;">Save Update</button> 
+      <button type="button" onclick="toggleEditModal(false)" class="flex-1 py-3.5 rounded-lg font-bold" style="background-color:#2a2d3e; color:#6b7084;">Cancel</button>
      </div>
     </form>
    </div>
@@ -336,6 +321,6 @@
    </div>
   </div>
 
-  <script src="script.js"></script>
+  <script src="script.js?v=300"></script>
  </body>
 </html>

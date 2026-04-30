@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 2.0 Loaded!");
+console.log("App Version 3.0 Loaded! Old Modal Removed.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -362,20 +362,4 @@ function createRow(order) {
     <td class="px-4 py-3 text-center">
       <select onchange="changeStatus('${order.__backendId}', this.value)" class="bg-transparent border rounded px-2 py-1 outline-none text-xs font-semibold cursor-pointer" style="border-color:${statusColor}; color:${statusColor};">
         <option value="Payment Pending" ${order.payment_status === 'Payment Pending' ? 'selected' : ''} style="color:#f59e0b; background:#181a24;">Payment Pending</option>
-        <option value="Cash" ${order.payment_status === 'Cash' ? 'selected' : ''} style="color:#10b981; background:#181a24;">Delivered (Cash)</option>
-        <option value="UPI Done" ${order.payment_status === 'UPI Done' ? 'selected' : ''} style="color:#3b82f6; background:#181a24;">Delivered (UPI)</option>
-        ${(order.payment_status || '').includes('Split') ? `<option value="${esc(order.payment_status)}" selected style="color:#a855f7; background:#181a24;">Delivered (Split)</option>` : ''}
-      </select>
-    </td>
-    <td class="px-4 py-3 text-center">
-      ${isConfirming ? `<div class="flex items-center justify-center gap-1"><button onclick="confirmDelete('${order.__backendId}')" class="rounded px-2 py-1 text-xs" style="background:#dc2626;color:#fff;">Confirm</button><button onclick="cancelDelete()" class="rounded px-2 py-1 text-xs" style="background:#2a2d3e;color:#6b7084;">Cancel</button></div>` : `<div class="flex items-center justify-center gap-3"><button onclick="openEditModal('${order.__backendId}')" class="rounded hover:bg-blue-500/20 p-1.5" style="color:#60a5fa;">✏️</button><button onclick="requestDelete('${order.__backendId}')" class="rounded hover:bg-red-500/20 p-1.5" style="color:#ef4444;">🗑️</button></div>`}
-    </td>
-  `;
-  return tr;
-}
-
-function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
-
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => { currentTableFilter = btn.dataset.filter; document.querySelectorAll('.filter-btn').forEach(b => { b.style.background = '#2a2d3e'; b.style.color = '#6b7084'; }); btn.style.background = defaultConfig.primary_action_color; btn.style.color = '#fff'; renderOrders(); });
-});
+        <option value="Cash" ${order.payment_status === 'Cash' ? 'selected' : ''} style="color:#10b981; background:#181a24;">Delivered
