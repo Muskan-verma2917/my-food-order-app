@@ -7,18 +7,13 @@
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=200">
+  
+  <link rel="stylesheet" href="style.css?v=705">
   <link rel="manifest" href="manifest.json">
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-  <script>
-    if ('serviceWorker' in navigator) {
-      // Is baar sw.js ke aage version lagaya hai taaki wo purana wala delete ho jaye
-      navigator.serviceWorker.register('sw.js?v=200');
-    }
-  </script>
  </head>
  <body class="text-[#f0ece4]" style="font-family:'DM Sans',sans-serif;">
   
@@ -30,7 +25,7 @@
     <div class="flex items-center gap-3 w-full lg:w-auto justify-center lg:justify-start">
      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:#e85d3a;"><i data-lucide="utensils" style="width:18px;height:18px;color:#fff;"></i></div>
      <h1 id="app-title" class="text-lg sm:text-xl font-bold flex items-center gap-2" style="font-family:'Playfair Display',serif;">
-       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v2.0</span>
+       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v7.0</span>
      </h1>
     </div>
     
@@ -52,7 +47,7 @@
        <i data-lucide="book-open" style="width:16px;height:16px;"></i> Menu 
      </button>
 
-     <button onclick="toggleModal(true)" class="flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-white shadow-lg transition-transform hover:scale-105 text-sm" style="background: #ff5a36;"> 
+     <button onclick="openNewOrderModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-white shadow-lg transition-transform hover:scale-105 text-sm" style="background: #ff5a36;"> 
        <i data-lucide="plus-circle" style="width:16px;height:16px;"></i> New Order 
      </button>
     </div>
@@ -60,29 +55,24 @@
    
    <main class="px-4 sm:px-8 py-6 max-w-7xl mx-auto w-full">
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-     <!-- 1. Sales -->
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-2 flex items-center gap-2"><i data-lucide="dollar-sign" style="width:14px;height:14px;"></i> Sales (INR)</div>
       <div id="stat-sales-inr" class="text-3xl font-bold" style="color: #ff5a36;">₹0</div>
      </div>
-     <!-- 2. Sales + Delivery -->
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-2 flex items-center gap-2"><i data-lucide="package" style="width:14px;height:14px;"></i> Sales + Delivery</div>
       <div id="stat-sales-delivery" class="text-3xl font-bold" style="color: #ff5a36;">₹0</div>
      </div>
-     <!-- 3. Total Orders -->
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-2 flex items-center gap-2"><i data-lucide="file-text" style="width:14px;height:14px;"></i> Total Orders</div>
       <div id="stat-total-orders" class="text-3xl font-bold" style="color: #f0ece4;">0</div>
      </div>
-     <!-- 4. Delivered (Total) -->
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-2"><i data-lucide="check-circle" style="width:14px;height:14px;"></i> Delivered (Total)</div>
       <div id="stat-delivered" class="text-3xl font-bold mb-2" style="color: #22c55e;">0</div>
       <div id="stat-delivered-total" class="text-lg font-semibold" style="color: #22c55e;">₹0.00</div>
       <p class="text-[10px] mt-1 text-slate-500">All Completed Orders</p>
      </div>
-     <!-- 5. Delivered (Cash) -->
      <div class="stat-card rounded-xl p-4 sm:p-5 flex flex-col justify-between" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div>
        <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-2 flex items-center gap-2"><i data-lucide="banknote" style="width:14px;height:14px;"></i> Delivered (Cash)</div>
@@ -104,21 +94,18 @@
        <div id="pending-cash-display" class="text-right text-[11px] font-bold mt-1.5" style="min-height: 16px;"></div>
       </div>
      </div>
-     <!-- 6. Delivered (UPI) -->
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-2"><i data-lucide="credit-card" style="width:14px;height:14px;"></i> Delivered (UPI)</div>
       <div id="stat-delivered-upi" class="text-3xl font-bold mb-2" style="color: #3b82f6;">0</div>
       <div id="stat-delivered-upi-total" class="text-lg font-semibold" style="color: #3b82f6;">₹0.00</div>
       <p class="text-[10px] mt-1 text-slate-500">Bank Received</p>
      </div>
-     <!-- 7. Pending Orders -->
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-2"><i data-lucide="clock" style="width:14px;height:14px;"></i> Payment Pending</div>
       <div id="stat-payment-pending" class="text-3xl font-bold mb-2" style="color: #f59e0b;">0</div>
       <div id="stat-payment-pending-total" class="text-lg font-semibold" style="color: #f59e0b;">₹0.00</div>
       <p class="text-[10px] mt-1 text-slate-500">Total Pending</p>
      </div>
-     <!-- 8. Active Riders -->
      <div class="stat-card rounded-xl p-5 relative group" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center justify-between gap-2">
        <div class="flex items-center gap-2"><i data-lucide="bike" style="width:14px;height:14px;"></i> Active Riders</div>
@@ -135,7 +122,6 @@
        </div>
       </div>
      </div>
-     <!-- 9. Restaurants -->
      <div class="stat-card rounded-xl p-5 relative group cursor-help" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-2"><i data-lucide="store" style="width:14px;height:14px;"></i> Restaurants</div>
       <div id="stat-rest-count" class="text-3xl font-bold mb-2" style="color: #f43f5e;">0</div>
@@ -199,7 +185,6 @@
    </main>
   </div>
 
-  <!-- MENU MASTER MODAL -->
   <div id="menu-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
     <div class="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl" style="background:#181a24; border:1px solid #1e2030;">
       <button onclick="toggleMenuModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl z-10">✕</button>
@@ -212,17 +197,19 @@
       <div class="p-6 overflow-y-auto flex-1">
         <div class="bg-[#16181f] p-4 rounded-xl border border-slate-700 mb-6 relative">
           <h3 id="menu-form-title" class="text-sm font-semibold mb-3 text-slate-300">Add New Menu Item</h3>
+          
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
             <div class="md:col-span-3"><label class="block text-[10px] text-slate-500 mb-1">Restaurant</label><input type="text" id="menu-rest-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
             <div class="md:col-span-5"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" id="menu-item-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
             <div class="md:col-span-4"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label>
               <div class="flex gap-2">
                 <input type="number" id="menu-rate-input" class="flex-1 min-w-[80px] bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none">
-                <button type="button" id="menu-save-btn" onclick="handleMenuSubmit()" class="px-4 rounded-lg font-bold text-white transition hover:opacity-90 whitespace-nowrap shrink-0" style="background:#ff5a36;">Add</button>
+                <button type="button" id="menu-save-btn" onclick="handleMenuSubmit(event)" class="px-4 rounded-lg font-bold text-white transition hover:opacity-90 whitespace-nowrap shrink-0" style="background:#ff5a36;">Add</button>
                 <button type="button" id="menu-cancel-btn" onclick="cancelMenuEdit()" class="hidden px-3 rounded-lg font-bold text-slate-400 bg-slate-700 hover:text-white transition shrink-0">✕</button>
               </div>
             </div>
           </div>
+          
         </div>
         <div class="mb-3"><div class="relative"><div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"><i data-lucide="search" class="w-4 h-4 text-slate-400"></i></div><input type="text" id="menu-search-input" class="w-full bg-[#16181f] border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-slate-200 focus:border-[#ff5a36] outline-none transition-colors" placeholder="Search by Restaurant or Item Name..." oninput="renderMenuTable()"></div></div>
         <div class="border border-slate-700 rounded-xl overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-[#12141d] text-xs uppercase text-slate-500 tracking-wider"><tr><th class="px-4 py-3">Restaurant</th><th class="px-4 py-3">Item Name</th><th class="px-4 py-3 text-right">Rate (₹)</th><th class="px-4 py-3 text-center">Action</th></tr></thead><tbody id="menu-list-body" class="divide-y divide-slate-700/50"></tbody></table></div>
@@ -230,7 +217,6 @@
     </div>
   </div>
 
-  <!-- NAYA SMART EDIT ORDER MODAL (FULL ORDER EDIT) -->
   <div id="edit-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
    <div class="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 shadow-2xl" style="background:#181a24; border:1px solid #1e2030;">
     <button type="button" onclick="toggleEditModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl">✕</button>
@@ -238,14 +224,9 @@
       Edit Full Order <span id="edit-order-id-display" class="text-[#ff5a36] text-lg"></span>
     </h2>
     <form id="edit-order-form">
-     
-     <!-- Yahan par saare restaurant aur items ke box aayenge -->
      <div id="edit-restaurants-wrapper" class="space-y-6"></div>
-     
      <button type="button" onclick="addEditRestaurant()" class="w-full mt-4 py-2.5 border border-dashed border-slate-600 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:border-slate-500">+ Add Another Restaurant to this Order</button>
-     
      <hr class="border-slate-700/50 my-6">
-     
      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
       <div><label class="block text-xs font-medium text-slate-400 mb-1">Delivery Charge (₹)</label> <input type="number" id="edit-del-charge" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" step="0.01" oninput="calcEditTotal()"></div>
       <div><label class="block text-xs font-medium text-slate-400 mb-1">Payment Mode *</label> 
@@ -262,7 +243,6 @@
       </div>
       <div><label class="block text-xs font-medium text-slate-400 mb-1">Customer Contact</label> <input type="text" id="edit-contact" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
       <div class="md:col-span-2"><label class="block text-xs font-medium text-slate-400 mb-1">Delivery Address *</label> <input type="text" id="edit-address" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
-      
       <div><label class="block text-xs font-medium text-slate-400 mb-1">Rider Name</label> <input type="text" id="edit-rider" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
       <div><label class="block text-xs font-medium text-slate-400 mb-1">Shift *</label> 
         <select id="edit-shift" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" style="background-color: #1e212b;"> 
@@ -271,13 +251,11 @@
         </select>
       </div>
      </div>
-     
      <div class="space-y-2 bg-[#16181f] p-4 rounded-lg border border-slate-700 mb-6">
       <div class="flex items-center justify-between"><span class="text-slate-400 font-medium">Subtotal (Items):</span> <span id="edit-subtotal" class="font-semibold" style="color:#cbd5e1;">₹0</span></div>
       <div class="flex items-center justify-between"><span class="text-slate-400 font-medium">Delivery Charge:</span> <span id="edit-delivery-display" class="font-semibold" style="color:#cbd5e1;">₹0</span></div>
       <div class="border-t border-slate-600 pt-2 flex items-center justify-between"><span class="text-slate-300 font-bold">New Order Total:</span> <span id="edit-grand-total" class="text-2xl font-bold" style="color: #4ade80;">₹0</span></div>
      </div>
-     
      <div class="flex gap-3">
       <button type="button" id="edit-save-btn" onclick="handleFullEditSubmit(event)" class="flex-1 py-3.5 rounded-lg font-bold text-white shadow-lg" style="background-color:#ff5a36;">Save Update</button> 
       <button type="button" onclick="toggleEditModal(false)" class="flex-1 py-3.5 rounded-lg font-bold" style="background-color:#2a2d3e; color:#6b7084;">Cancel</button>
@@ -286,25 +264,14 @@
    </div>
   </div>
 
-  <!-- NEW ORDER MODAL -->
   <div id="form-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
    <div class="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 shadow-2xl" style="background:#181a24; border:1px solid #1e2030;"><button type="button" onclick="toggleModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl">✕</button>
     <h2 class="text-xl font-bold mb-6" style="color:#f0ece4; font-family:'Playfair Display',serif;">Create New Order</h2>
     <form id="new-premium-order-form">
      <div id="restaurants-wrapper" class="space-y-6">
-      <div class="rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f]" data-rest-id="1">
-       <div class="mb-4"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label> <input type="text" name="rest_name[]" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillAllItemsInBlock(this)"></div>
-       <div class="items-container space-y-3 mb-3" id="items-rest-1">
-        <div class="item-row flex gap-2 items-start">
-         <div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label> <input type="text" name="item_name[]" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillRate(this)"></div>
-         <div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label> <input type="number" name="rate[]" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" oninput="calcPremiumTotal()"></div>
-         <div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label> <input type="number" name="qty[]" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" value="1" min="1" oninput="calcPremiumTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500" onclick="removePremiumItem(this)">✕</button>
-        </div>
-       </div><button type="button" onclick="addPremiumItem(1)" class="text-xs font-semibold tracking-wide hover:opacity-80 transition-opacity" style="color: #ff5a36;">+ Add Item</button>
       </div>
-     </div><button type="button" onclick="addPremiumRestaurant()" class="w-full mt-4 py-2.5 border border-dashed border-slate-600 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:border-slate-500">+ Add Another Restaurant</button>
+     <button type="button" onclick="addPremiumRestaurant()" class="w-full mt-4 py-2.5 border border-dashed border-slate-600 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:border-slate-500">+ Add Another Restaurant</button>
      <hr class="border-slate-700/50 my-6">
-     
      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
       <div><label class="block text-xs font-medium text-slate-400 mb-1">Delivery Charge (₹)</label> <input type="number" id="p-del-charge" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" step="0.01" oninput="calcPremiumTotal()"></div>
       <div><label class="block text-xs font-medium text-slate-400 mb-1">Payment Mode *</label> <select id="p-payment" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" style="background-color: #1e212b;" onchange="toggleSplitFields()"> <option value="">Select Mode</option> <option value="UPI Done">UPI Done</option> <option value="Payment Pending">Payment Pending</option> <option value="Cash">Cash</option> <option value="Split">Split (Cash + UPI)</option> </select>
@@ -314,10 +281,9 @@
        </div>
       </div>
       <div><label class="block text-xs font-medium text-slate-400 mb-1">Customer Contact</label> <input type="text" id="p-contact" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
-      <div class="md:col-span-2"><label class="block text-xs font-medium text-slate-400 mb-1">Delivery Address *</label> <input type="text" id="p-address" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
-      
-      <div><label class="block text-xs font-medium text-slate-400 mb-1">Rider Name</label> <input type="text" id="p-rider" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
-      <div><label class="block text-xs font-medium text-slate-400 mb-1">Shift *</label> 
+      <div class="md:col-span-2"><label class="block text-[10px] text-slate-500 mb-1">Delivery Address *</label> <input type="text" id="p-address" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
+      <div><label class="block text-[10px] text-slate-500 mb-1">Rider Name</label> <input type="text" id="p-rider" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
+      <div><label class="block text-[10px] text-slate-500 mb-1">Shift *</label> 
         <select id="p-shift" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" style="background-color: #1e212b;"> 
           <option value="Before Lunch">☀️ Before Lunch</option> 
           <option value="After Lunch">🌙 After Lunch</option> 
@@ -334,6 +300,6 @@
    </div>
   </div>
 
-  <script src="script.js?v=200"></script>
+  <script src="script.js?v=705"></script>
  </body>
 </html>
