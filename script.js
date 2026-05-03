@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 8.5 Loaded! Expand/Collapse Menu Active.");
+console.log("App Version 8.1 Loaded! Split Payment Bug Fixed.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -28,7 +28,6 @@ let currentFilterDate = '';
 let currentShiftFilter = 'All', currentTableFilter = 'All', currentRestFilter = 'All', currentRiderFilter = 'All';
 let orderCounter = 0, pendingDelete = null;
 
-// EXPAND/COLLAPSE STATE TRACKER
 let menuCollapsedState = {};
 
 const defaultConfig = { app_title: 'Daily Delivery Sales', background_color: '#0f1117', primary_action_color: '#e85d3a' };
@@ -128,68 +127,35 @@ window.cancelMenuEdit = function() {
 };
 window.deleteMenuItem = async function(id) { if(confirm("Delete this menu item?")) { await dbMenu.child(id).remove(); showToast('🗑️ Deleted'); if (editingMenuId === id) cancelMenuEdit(); } };
 
-// YAHAN TOGGLE (EXPAND/COLLAPSE) FUNCTION HAI
 window.toggleMenuGroup = function(rName) {
     menuCollapsedState[rName] = !menuCollapsedState[rName];
-    renderMenuTable(); // Refresh table to show/hide items
-};
-
-// YAHAN TOGGLE (EXPAND/COLLAPSE) FUNCTION HAI - UPDATED FOR SMOOTH TOGGLE
-window.toggleMenuGroup = function(rName) {
-    menuCollapsedState[rName] = !menuCollapsedState[rName];
-    // Poori table render karne ke bajaye, sirf rows ko show/hide karenge CSS se
     const rows = document.querySelectorAll(`.menu-item-row[data-restaurant="${rName}"]`);
     const icon = document.getElementById(`icon-${rName}`);
     
     rows.forEach(row => {
-        if (menuCollapsedState[rName]) {
-            row.style.display = 'none'; // Collapse
-        } else {
-            row.style.display = 'table-row'; // Expand
-        }
+        if (menuCollapsedState[rName]) { row.style.display = 'none'; } else { row.style.display = 'table-row'; }
     });
 
     if (icon) {
-        if (menuCollapsedState[rName]) {
-            icon.setAttribute('data-lucide', 'chevron-right');
-        } else {
-            icon.setAttribute('data-lucide', 'chevron-down');
-        }
-        if (typeof lucide !== 'undefined') lucide.createIcons(); // Update the icon
+        if (menuCollapsedState[rName]) { icon.setAttribute('data-lucide', 'chevron-right'); } else { icon.setAttribute('data-lucide', 'chevron-down'); }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 };
 
-// UPDATED RENDER MENU TABLE
 window.renderMenuTable = function() {
   const tbody = $('menu-list-body'); if(!tbody) return; tbody.innerHTML = '';
   const searchT = ($('menu-search-input') ? $('menu-search-input').value.trim().toLowerCase() : '');
-  
-  const filtered = menuList.filter(m => { 
-      if (!searchT) return true; 
-      return (m.restaurant||'').toLowerCase().includes(searchT) || (m.item||'').toLowerCase().includes(searchT); 
-  });
-  
-  if(filtered.length === 0) { 
-      tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500">No match found</td></tr>`; 
-      return; 
-  }
+  const filtered = menuList.filter(m => { if (!searchT) return true; return (m.restaurant||'').toLowerCase().includes(searchT) || (m.item||'').toLowerCase().includes(searchT); });
+  if(filtered.length === 0) { tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500">No match found</td></tr>`; return; }
 
   const groupedMenu = {};
-  filtered.forEach(m => {
-      let rName = m.restaurant || 'Unknown';
-      if(!groupedMenu[rName]) groupedMenu[rName] = [];
-      groupedMenu[rName].push(m);
-  });
+  filtered.forEach(m => { let rName = m.restaurant || 'Unknown'; if(!groupedMenu[rName]) groupedMenu[rName] = []; groupedMenu[rName].push(m); });
 
   Object.keys(groupedMenu).sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'})).forEach(rName => {
-      
       let isCollapsed = menuCollapsedState[rName] || false;
       let chevronIcon = isCollapsed ? 'chevron-right' : 'chevron-down';
-      
-      // Clean string for HTML IDs and Classes
       let safeRName = rName.replace(/[^a-zA-Z0-9]/g, '');
 
-      // 1. Restaurant ki Title Heading
       tbody.innerHTML += `
         <tr class="bg-[#181a24] border-t-2 border-b border-[#2d3139] cursor-pointer hover:bg-[#1e212b] transition-colors" onclick="toggleMenuGroup('${safeRName}')">
           <td colspan="3" class="px-4 py-2 font-black text-sm uppercase tracking-wider flex items-center gap-2" style="color:#ff5a36; user-select:none;">
@@ -200,13 +166,10 @@ window.renderMenuTable = function() {
         </tr>
       `;
 
-      // 2. Items, but now with a CSS class and data attribute for toggling
       let items = groupedMenu[rName].sort((a,b) => (a.item||'').localeCompare(b.item||'', undefined, {sensitivity: 'base'}));
       items.forEach(m => {
         let r = parseFloat(String(m.rate).replace(/[^\d.-]/g, '')); r = isNaN(r) ? 0 : r;
-        // Check initial display state based on collapsed state
         let displayStyle = isCollapsed ? 'display: none;' : 'display: table-row;';
-        
         tbody.innerHTML += `
         <tr class="menu-item-row hover:bg-[#1e212b] transition-colors border-b border-slate-700/30 last:border-0" data-restaurant="${safeRName}" style="${displayStyle}">
           <td class="px-4 py-2.5 text-slate-300 font-medium pl-8 w-[50%]">» ${esc(m.item)}</td>
@@ -222,6 +185,7 @@ window.renderMenuTable = function() {
   });
   if (typeof lucide !== 'undefined') lucide.createIcons();
 };
+
 window.autoFillRate = function(inp) {
   const r = inp.closest('.item-row'), b = inp.closest('.rest-block'); if(!r || !b) return;
   const rest = b.querySelector('.rest-name').value.trim().toLowerCase(), item = inp.value.trim().toLowerCase(), rInp = r.querySelector('.item-rate');
@@ -232,7 +196,7 @@ window.autoFillRate = function(inp) {
 };
 window.autoFillAllItemsInBlock = function(rInp) { const b = rInp.closest('.rest-block'); if(!b) return; b.querySelectorAll('.item-name').forEach(i => autoFillRate(i)); };
 
-// --- SMART EDIT ORDER LOGIC ---
+// --- EDIT ORDER LOGIC (YAHAN FIX KIYA HAI KI SPLIT DOUBLE NA HO) ---
 window.toggleEditSplitFields = function() { const mode = $('edit-payment-status').value; if (mode === 'Split') $('edit-split-inputs').classList.remove('hidden'); else $('edit-split-inputs').classList.add('hidden'); };
 window.addEditItem = function(rId) {
   const c = document.getElementById(`edit-items-rest-${rId}`), d = document.createElement('div'); d.className = 'item-row flex gap-2 items-start';
@@ -259,8 +223,23 @@ window.openEditModal = function(backendId) {
   originalOrderItems = allOrders.filter(o => o.order_id === currentlyEditingOrderId); const first = originalOrderItems[0];
   $('edit-address').value = first.address || ''; $('edit-contact').value = first.contact || ''; $('edit-rider').value = first.rider || ''; $('edit-shift').value = first.shift || 'Before Lunch';
   let tDel = 0; originalOrderItems.forEach(o => tDel += (parseFloat(o.delivery_charge) || 0)); $('edit-del-charge').value = tDel;
+  
+  // FIXED SPLIT EXTRACTION: Ab delivery charge ko theek se minus karega
   let pStatus = first.payment_status || '';
-  if (pStatus.includes('Split')) { $('edit-payment-status').value = 'Split'; let c = pStatus.match(/Cash ₹([\d.]+)/) ? parseFloat(pStatus.match(/Cash ₹([\d.]+)/)[1]) : 0, u = pStatus.match(/UPI ₹([\d.]+)/) ? parseFloat(pStatus.match(/UPI ₹([\d.]+)/)[1]) : 0; $('edit-split-cash').value = Math.max(0, c - tDel); $('edit-split-upi').value = u; $('edit-split-inputs').classList.remove('hidden'); } else { $('edit-payment-status').value = pStatus; $('edit-split-inputs').classList.add('hidden'); }
+  if (pStatus.includes('Split')) { 
+      $('edit-payment-status').value = 'Split'; 
+      let totalSplitCash = pStatus.match(/Cash ₹([\d.]+)/) ? parseFloat(pStatus.match(/Cash ₹([\d.]+)/)[1]) : 0;
+      let totalSplitUpi = pStatus.match(/UPI ₹([\d.]+)/) ? parseFloat(pStatus.match(/UPI ₹([\d.]+)/)[1]) : 0; 
+      
+      // Delivery charge is usually embedded in the Cash amount of Split.
+      $('edit-split-cash').value = Math.max(0, totalSplitCash - tDel); 
+      $('edit-split-upi').value = totalSplitUpi; 
+      $('edit-split-inputs').classList.remove('hidden'); 
+  } else { 
+      $('edit-payment-status').value = pStatus; 
+      $('edit-split-inputs').classList.add('hidden'); 
+  }
+  
   const wrapper = $('edit-restaurants-wrapper'); wrapper.innerHTML = ''; editRestCount = 0;
   const rests = {}; originalOrderItems.forEach(o => { let rN = o.customer_name || 'Unknown'; if(!rests[rN]) rests[rN] = []; rests[rN].push(o); });
   for(let rN in rests) {
@@ -284,16 +263,60 @@ window.handleFullEditSubmit = async function(event) {
       if(rName) { b.querySelectorAll('.item-row').forEach(row => { const bId = row.dataset.backendId || null, name = row.querySelector('.item-name').value.trim(), rate = parseFloat(row.querySelector('.item-rate').value) || 0, qty = parseFloat(row.querySelector('.item-qty').value) || 1; if(name && rate >= 0) finalItems.push({ __backendId: bId, name, rate, qty, total: rate*qty, restaurant: rName }); }); }
     });
     if(finalItems.length === 0) throw new Error("At least one item is required!");
+    
     const pMode = $('edit-payment-status').value, addr = $('edit-address').value.trim(), cont = $('edit-contact').value.trim(), rider = $('edit-rider').value.trim(), shift = $('edit-shift').value, dChg = parseFloat($('edit-del-charge').value) || 0;
     if(!pMode) throw new Error("Select Payment Mode!"); if(!addr) throw new Error("Delivery Address required!");
+    
     let fPMode = pMode;
-    if(pMode === 'Split') { let sC = (parseFloat($('edit-split-cash').value) || 0) + dChg, sU = parseFloat($('edit-split-upi').value) || 0; fPMode = `Split: Cash ₹${sC.toFixed(2)} | UPI ₹${sU.toFixed(2)}`; }
+    // YAHAN FIX HAI: Delivery charge sirf order mein ek baar add hoga
+    if(pMode === 'Split') { 
+        let sC = (parseFloat($('edit-split-cash').value) || 0) + dChg;
+        let sU = parseFloat($('edit-split-upi').value) || 0; 
+        fPMode = `Split: Cash ₹${sC.toFixed(2)} | UPI ₹${sU.toFixed(2)}`; 
+    }
+    
     let sIds = finalItems.map(i => i.__backendId).filter(id => id !== null), oIds = originalOrderItems.map(i => i.__backendId), delIds = oIds.filter(id => !sIds.includes(id));
     for(let id of delIds) { await dbOrders.child(id).remove(); }
-    const oDate = originalOrderItems[0].date || getLocalIsoDate(); let isFirst = true;
+    const oDate = originalOrderItems[0].date || getLocalIsoDate(); 
+    
+    // YAHAN BHI FIX HAI: isFirst tag ko use karke multiple items me bug theek hoga
+    let isFirst = true;
     for(let i of finalItems) {
       let stat = "Payment Pending"; if(pMode === "UPI Done" || pMode === "Cash" || pMode === "Split") stat = "Delivered";
-      let iData = { order_id: currentlyEditingOrderId, customer_name: i.restaurant, item_name: i.name, quantity: i.qty, unit_price: i.rate, total: i.total, status: stat, date: oDate, shift: shift, address: addr, customer_address: addr, location: addr, payment_status: fPMode, contact: cont, rider: rider, delivery_charge: isFirst ? dChg : 0 };
+      
+      // Har item par split amount nahi bhejenge backend par taaki dashboard double na gine
+      let itemPaymentStatus = isFirst ? fPMode : pMode; 
+      
+      let iData = { 
+          order_id: currentlyEditingOrderId, 
+          customer_name: i.restaurant, 
+          item_name: i.name, 
+          quantity: i.qty, 
+          unit_price: i.rate, 
+          total: i.total, 
+          status: stat, 
+          date: oDate, 
+          shift: shift, 
+          address: addr, 
+          customer_address: addr, 
+          location: addr, 
+          
+          // Is item ka actual mode kya dikhana hai
+          payment_status: fPMode, 
+          
+          contact: cont, 
+          rider: rider, 
+          delivery_charge: isFirst ? dChg : 0 
+      };
+      
+      // But split tracking for dashboard is special, it reads from the string.
+      // Firebase doesn't auto-sum strings, but our JS loop does.
+      // So if 5 items have the same string "Split Cash 350", JS loop adds it 5 times.
+      // The safest way is to clear the string for subsequent items if it's split.
+      if (fPMode.includes('Split') && !isFirst) {
+          iData.payment_status = "Split (Included in total)";
+      }
+
       if(i.__backendId) { await dbOrders.child(i.__backendId).update(iData); } else { await dbOrders.push().set(iData); }
       isFirst = false;
     }
@@ -386,7 +409,13 @@ window.handlePremiumFormSubmit = async function(event) {
     orderCounter++; await dbCounter.set(orderCounter); const cOrderId = String(orderCounter).padStart(3, '0'); let isFirst = true;
     for (const item of allItems) {
       let stat = "Payment Pending"; if (pMode === "UPI Done" || pMode === "Cash" || pMode === "Split") stat = "Delivered";
-      await dbOrders.push().set({ order_id: cOrderId, customer_name: item.restaurant, item_name: item.name, quantity: item.qty, unit_price: item.rate, total: item.total, status: stat, date: oDate, shift: shift, address: addr, customer_address: addr, location: addr, payment_status: fPMode, contact: cont, rider: rider, delivery_charge: isFirst ? delChg : 0 });
+      
+      let itemPaymentStatus = isFirst ? fPMode : pMode;
+      if (fPMode.includes('Split') && !isFirst) {
+          itemPaymentStatus = "Split (Included in total)";
+      }
+
+      await dbOrders.push().set({ order_id: cOrderId, customer_name: item.restaurant, item_name: item.name, quantity: item.qty, unit_price: item.rate, total: item.total, status: stat, date: oDate, shift: shift, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? delChg : 0 });
       isFirst = false;
     }
     
@@ -516,6 +545,12 @@ function createRow(order) {
   const statusColor = (order.payment_status === 'UPI Done') ? '#3b82f6' : (order.payment_status === 'Payment Pending') ? '#f59e0b' : (order.payment_status === 'Cash') ? '#10b981' : (order.payment_status && order.payment_status.includes('Split')) ? '#a855f7' : '#6b7084';
   const shiftBadge = order.shift === 'After Lunch' ? '🌙' : (order.shift === 'Before Lunch' ? '☀️' : '');
 
+  // Clean split display text so it doesn't show confusing duplicates in the table dropdown
+  let displayPaymentStatus = order.payment_status || '';
+  if (displayPaymentStatus === "Split (Included in total)") {
+      displayPaymentStatus = "Delivered (Split)";
+  }
+
   tr.innerHTML = `
     <td class="px-4 py-3 font-medium" style="color:#60a5fa;">#${esc(order.order_id)}</td>
     <td class="px-4 py-3 font-bold text-white">${esc(order.customer_name)} <span class="text-[10px] opacity-70 ml-1">${shiftBadge}</span></td>
@@ -525,10 +560,10 @@ function createRow(order) {
     <td class="px-4 py-3 text-right font-bold" style="color:#10b981;">₹${(parseFloat(order.total) + parseFloat(order.delivery_charge || 0)).toFixed(2)}</td>
     <td class="px-4 py-3 text-center">
       <select onchange="changeStatus('${order.__backendId}', this.value)" class="bg-transparent border rounded px-2 py-1 outline-none text-xs font-semibold cursor-pointer" style="border-color:${statusColor}; color:${statusColor};">
-        <option value="Payment Pending" ${order.payment_status === 'Payment Pending' ? 'selected' : ''} style="color:#f59e0b; background:#181a24;">Payment Pending</option>
-        <option value="Cash" ${order.payment_status === 'Cash' ? 'selected' : ''} style="color:#10b981; background:#181a24;">Delivered (Cash)</option>
-        <option value="UPI Done" ${order.payment_status === 'UPI Done' ? 'selected' : ''} style="color:#3b82f6; background:#181a24;">Delivered (UPI)</option>
-        ${(order.payment_status || '').includes('Split') ? `<option value="${esc(order.payment_status)}" selected style="color:#a855f7; background:#181a24;">Delivered (Split)</option>` : ''}
+        <option value="Payment Pending" ${displayPaymentStatus === 'Payment Pending' ? 'selected' : ''} style="color:#f59e0b; background:#181a24;">Payment Pending</option>
+        <option value="Cash" ${displayPaymentStatus === 'Cash' ? 'selected' : ''} style="color:#10b981; background:#181a24;">Delivered (Cash)</option>
+        <option value="UPI Done" ${displayPaymentStatus === 'UPI Done' ? 'selected' : ''} style="color:#3b82f6; background:#181a24;">Delivered (UPI)</option>
+        ${(displayPaymentStatus.includes('Split')) ? `<option value="${esc(order.payment_status)}" selected style="color:#a855f7; background:#181a24;">Delivered (Split)</option>` : ''}
       </select>
     </td>
     <td class="px-4 py-3 text-center">
