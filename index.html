@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=705">
+  <link rel="stylesheet" href="style.css?v=805">
   <link rel="manifest" href="manifest.json">
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -25,7 +25,7 @@
     <div class="flex items-center gap-3 w-full lg:w-auto justify-center lg:justify-start">
      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:#e85d3a;"><i data-lucide="utensils" style="width:18px;height:18px;color:#fff;"></i></div>
      <h1 id="app-title" class="text-lg sm:text-xl font-bold flex items-center gap-2" style="font-family:'Playfair Display',serif;">
-       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v7.0</span>
+       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v8.5</span>
      </h1>
     </div>
     
@@ -199,9 +199,9 @@
           <h3 id="menu-form-title" class="text-sm font-semibold mb-3 text-slate-300">Add New Menu Item</h3>
           
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-            <div class="md:col-span-3"><label class="block text-[10px] text-slate-500 mb-1">Restaurant</label><input type="text" id="menu-rest-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
+            <div class="md:col-span-4"><label class="block text-[10px] text-slate-500 mb-1">Restaurant</label><input type="text" id="menu-rest-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
             <div class="md:col-span-5"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" id="menu-item-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
-            <div class="md:col-span-4"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label>
+            <div class="md:col-span-3"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label>
               <div class="flex gap-2">
                 <input type="number" id="menu-rate-input" class="flex-1 min-w-[80px] bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none">
                 <button type="button" id="menu-save-btn" onclick="handleMenuSubmit(event)" class="px-4 rounded-lg font-bold text-white transition hover:opacity-90 whitespace-nowrap shrink-0" style="background:#ff5a36;">Add</button>
@@ -212,7 +212,20 @@
           
         </div>
         <div class="mb-3"><div class="relative"><div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"><i data-lucide="search" class="w-4 h-4 text-slate-400"></i></div><input type="text" id="menu-search-input" class="w-full bg-[#16181f] border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-slate-200 focus:border-[#ff5a36] outline-none transition-colors" placeholder="Search by Restaurant or Item Name..." oninput="renderMenuTable()"></div></div>
-        <div class="border border-slate-700 rounded-xl overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-[#12141d] text-xs uppercase text-slate-500 tracking-wider"><tr><th class="px-4 py-3">Restaurant</th><th class="px-4 py-3">Item Name</th><th class="px-4 py-3 text-right">Rate (₹)</th><th class="px-4 py-3 text-center">Action</th></tr></thead><tbody id="menu-list-body" class="divide-y divide-slate-700/50"></tbody></table></div>
+        
+        <div class="border border-slate-700 rounded-xl overflow-hidden">
+          <table class="w-full text-sm text-left">
+            <thead class="bg-[#12141d] text-xs uppercase text-slate-500 tracking-wider">
+              <tr>
+                <th class="px-4 py-3 w-[50%]">Item Name</th>
+                <th class="px-4 py-3 text-right">Rate (₹)</th>
+                <th class="px-4 py-3 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="menu-list-body" class="divide-y divide-slate-700/50">
+              </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -300,6 +313,6 @@
    </div>
   </div>
 
-  <script src="script.js?v=705"></script>
+  <script src="script.js?v=805"></script>
  </body>
 </html>

@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 7.0.5 Loaded! Fresh New Order Form Fixed.");
+console.log("App Version 8.5 Loaded! Expand/Collapse Menu Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -27,6 +27,9 @@ let currentlyEditingOrderId = null, originalOrderItems = [], editRestCount = 0;
 let currentFilterDate = ''; 
 let currentShiftFilter = 'All', currentTableFilter = 'All', currentRestFilter = 'All', currentRiderFilter = 'All';
 let orderCounter = 0, pendingDelete = null;
+
+// EXPAND/COLLAPSE STATE TRACKER
+let menuCollapsedState = {};
 
 const defaultConfig = { app_title: 'Daily Delivery Sales', background_color: '#0f1117', primary_action_color: '#e85d3a' };
 const $ = id => document.getElementById(id);
@@ -56,19 +59,12 @@ window.handleDepositedCashChange = function() {
 
 window.updatePendingCashUI = function(inputVal = null) {
   const inputEl = $('deposited-cash-input'), labelEl = $('deposited-label'), display = $('pending-cash-display');
-  
   if (!currentFilterDate) {
-      if (inputEl && labelEl) {
-         inputEl.value = ''; inputEl.disabled = true; inputEl.parentElement.style.opacity = '0.5';
-         labelEl.textContent = 'Select Date for Cash:'; labelEl.style.color = '#94a3b8';
-      }
-      if (display) display.textContent = '';
-      return;
+      if (inputEl && labelEl) { inputEl.value = ''; inputEl.disabled = true; inputEl.parentElement.style.opacity = '0.5'; labelEl.textContent = 'Select Date for Cash:'; labelEl.style.color = '#94a3b8'; }
+      if (display) display.textContent = ''; return;
   }
-
   const dateStr = currentFilterDate, shiftStr = currentShiftFilter.replace(/\s+/g, ''), key = dateStr + "_" + shiftStr;
   let deposited = inputVal;
-
   if (currentShiftFilter === 'All') {
     const beforeVal = parseFloat(depositedCashData[dateStr + "_BeforeLunch"]) || 0, afterVal = parseFloat(depositedCashData[dateStr + "_AfterLunch"]) || 0;
     deposited = beforeVal + afterVal;
@@ -77,7 +73,6 @@ window.updatePendingCashUI = function(inputVal = null) {
     if (deposited === null) { deposited = depositedCashData[key] || 0; }
     if (inputEl && labelEl) { inputEl.value = deposited || ''; inputEl.disabled = false; inputEl.parentElement.style.opacity = '1'; inputEl.parentElement.style.pointerEvents = 'auto'; labelEl.textContent = 'Rider Deposited:'; labelEl.style.color = '#94a3b8'; }
   }
-  
   let numDeposited = parseFloat(deposited) || 0, pending = currentTotalCash - numDeposited;
   if (!display) return;
   if (pending > 0) { display.textContent = `⚠️ Pending: ₹${pending.toFixed(2)}`; display.style.color = '#ef4444'; } 
@@ -87,22 +82,16 @@ window.updatePendingCashUI = function(inputVal = null) {
 };
 
 window.toggleModal = function(show) { 
-    const modal = document.getElementById('form-modal'); 
-    if(!modal) return; 
-    if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; } 
-    else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; } 
+    const modal = document.getElementById('form-modal'); if(!modal) return; 
+    if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; } else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; } 
 };
 window.toggleEditModal = function(show) { 
-    const modal = document.getElementById('edit-modal'); 
-    if(!modal) return; 
-    if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; } 
-    else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; } 
+    const modal = document.getElementById('edit-modal'); if(!modal) return; 
+    if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; } else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; } 
 };
 window.toggleMenuModal = function(show) { 
-    const modal = document.getElementById('menu-modal'); 
-    if(!modal) return; 
-    if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; if (typeof lucide !== 'undefined') lucide.createIcons(); } 
-    else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; cancelMenuEdit(); } 
+    const modal = document.getElementById('menu-modal'); if(!modal) return; 
+    if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; if (typeof lucide !== 'undefined') lucide.createIcons(); } else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; cancelMenuEdit(); } 
 };
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -113,40 +102,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
 window.handleMenuSubmit = async function(event) {
   if (event) event.preventDefault();
-  const btn = $('menu-save-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-
+  const btn = $('menu-save-btn'); if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
   try {
-    const rest = $('menu-rest-input').value.trim();
-    const item = $('menu-item-input').value.trim();
-    const rate = parseFloat($('menu-rate-input').value) || 0; 
-    
+    const rest = $('menu-rest-input').value.trim(); const item = $('menu-item-input').value.trim(); const rate = parseFloat($('menu-rate-input').value) || 0; 
     if(!rest || !item) { showToast('Please fill Restaurant and Item Name!', 'error'); return; }
-    
     if (editingMenuId) { 
-        await dbMenu.child(editingMenuId).update({ restaurant: rest, item: item, rate: rate }); 
-        showToast(`✅ ${item} updated!`); 
-        cancelMenuEdit(); 
+        await dbMenu.child(editingMenuId).update({ restaurant: rest, item: item, rate: rate }); showToast(`✅ ${item} updated!`); cancelMenuEdit(); 
     } else {
-        const isDuplicate = menuList.some(m => 
-            (m.restaurant || '').toLowerCase() === rest.toLowerCase() && 
-            (m.item || '').toLowerCase() === item.toLowerCase()
-        );
-        
-        if (isDuplicate) { 
-            showToast(`⚠️ ${item} already added for ${rest}!`, 'error'); 
-            return; 
-        }
-        await dbMenu.push().set({ restaurant: rest, item: item, rate: rate }); 
-        showToast(`✅ ${item} added!`); 
-        cancelMenuEdit();
+        const isDuplicate = menuList.some(m => (m.restaurant || '').toLowerCase() === rest.toLowerCase() && (m.item || '').toLowerCase() === item.toLowerCase());
+        if (isDuplicate) { showToast(`⚠️ ${item} already added for ${rest}!`, 'error'); return; }
+        await dbMenu.push().set({ restaurant: rest, item: item, rate: rate }); showToast(`✅ ${item} added!`); cancelMenuEdit();
     }
-  } catch (err) { 
-      console.error(err);
-      showToast('Error: ' + err.message, 'error'); 
-  } finally {
-      if (btn) { btn.disabled = false; btn.textContent = editingMenuId ? 'Update' : 'Add'; }
-  }
+  } catch (err) { console.error(err); showToast('Error: ' + err.message, 'error'); } finally { if (btn) { btn.disabled = false; btn.textContent = editingMenuId ? 'Update' : 'Add'; } }
 };
 
 window.editMenuItem = function(id) {
@@ -161,19 +128,100 @@ window.cancelMenuEdit = function() {
 };
 window.deleteMenuItem = async function(id) { if(confirm("Delete this menu item?")) { await dbMenu.child(id).remove(); showToast('🗑️ Deleted'); if (editingMenuId === id) cancelMenuEdit(); } };
 
+// YAHAN TOGGLE (EXPAND/COLLAPSE) FUNCTION HAI
+window.toggleMenuGroup = function(rName) {
+    menuCollapsedState[rName] = !menuCollapsedState[rName];
+    renderMenuTable(); // Refresh table to show/hide items
+};
+
+// YAHAN TOGGLE (EXPAND/COLLAPSE) FUNCTION HAI - UPDATED FOR SMOOTH TOGGLE
+window.toggleMenuGroup = function(rName) {
+    menuCollapsedState[rName] = !menuCollapsedState[rName];
+    // Poori table render karne ke bajaye, sirf rows ko show/hide karenge CSS se
+    const rows = document.querySelectorAll(`.menu-item-row[data-restaurant="${rName}"]`);
+    const icon = document.getElementById(`icon-${rName}`);
+    
+    rows.forEach(row => {
+        if (menuCollapsedState[rName]) {
+            row.style.display = 'none'; // Collapse
+        } else {
+            row.style.display = 'table-row'; // Expand
+        }
+    });
+
+    if (icon) {
+        if (menuCollapsedState[rName]) {
+            icon.setAttribute('data-lucide', 'chevron-right');
+        } else {
+            icon.setAttribute('data-lucide', 'chevron-down');
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons(); // Update the icon
+    }
+};
+
+// UPDATED RENDER MENU TABLE
 window.renderMenuTable = function() {
   const tbody = $('menu-list-body'); if(!tbody) return; tbody.innerHTML = '';
   const searchT = ($('menu-search-input') ? $('menu-search-input').value.trim().toLowerCase() : '');
-  const filtered = menuList.filter(m => { if (!searchT) return true; return (m.restaurant||'').toLowerCase().includes(searchT) || (m.item||'').toLowerCase().includes(searchT); });
-  if(filtered.length === 0) { tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-500">No match found</td></tr>`; return; }
-  let sorted = [...filtered].sort((a,b) => (a.restaurant||'').localeCompare(b.restaurant||'') || (a.item||'').localeCompare(b.item||''));
-  sorted.forEach(m => {
-    let r = parseFloat(String(m.rate).replace(/[^\d.-]/g, '')); r = isNaN(r) ? 0 : r;
-    tbody.innerHTML += `<tr class="hover:bg-[#1e212b] transition-colors"><td class="px-4 py-2 font-medium text-white">${esc(m.restaurant)}</td><td class="px-4 py-2 text-slate-300">${esc(m.item)}</td><td class="px-4 py-2 text-right font-bold text-[#ff5a36]">₹${r}</td><td class="px-4 py-2 text-center"><div class="flex items-center justify-center gap-2"><button onclick="editMenuItem('${m.__backendId}')" class="text-blue-400 hover:text-blue-300 p-1"><i data-lucide="pencil" style="width:16px;height:16px;"></i></button><button onclick="deleteMenuItem('${m.__backendId}')" class="text-slate-500 hover:text-red-500 p-1"><i data-lucide="trash-2" style="width:16px;height:16px;"></i></button></div></td></tr>`;
+  
+  const filtered = menuList.filter(m => { 
+      if (!searchT) return true; 
+      return (m.restaurant||'').toLowerCase().includes(searchT) || (m.item||'').toLowerCase().includes(searchT); 
+  });
+  
+  if(filtered.length === 0) { 
+      tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500">No match found</td></tr>`; 
+      return; 
+  }
+
+  const groupedMenu = {};
+  filtered.forEach(m => {
+      let rName = m.restaurant || 'Unknown';
+      if(!groupedMenu[rName]) groupedMenu[rName] = [];
+      groupedMenu[rName].push(m);
+  });
+
+  Object.keys(groupedMenu).sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'})).forEach(rName => {
+      
+      let isCollapsed = menuCollapsedState[rName] || false;
+      let chevronIcon = isCollapsed ? 'chevron-right' : 'chevron-down';
+      
+      // Clean string for HTML IDs and Classes
+      let safeRName = rName.replace(/[^a-zA-Z0-9]/g, '');
+
+      // 1. Restaurant ki Title Heading
+      tbody.innerHTML += `
+        <tr class="bg-[#181a24] border-t-2 border-b border-[#2d3139] cursor-pointer hover:bg-[#1e212b] transition-colors" onclick="toggleMenuGroup('${safeRName}')">
+          <td colspan="3" class="px-4 py-2 font-black text-sm uppercase tracking-wider flex items-center gap-2" style="color:#ff5a36; user-select:none;">
+            <i id="icon-${safeRName}" data-lucide="${chevronIcon}" style="width:16px;height:16px; transition: transform 0.2s;"></i>
+            <i data-lucide="store" style="width:14px;height:14px;"></i> ${esc(rName)} 
+            <span class="text-[10px] text-slate-500 ml-2 normal-case font-normal tracking-normal">(${groupedMenu[rName].length} items)</span>
+          </td>
+        </tr>
+      `;
+
+      // 2. Items, but now with a CSS class and data attribute for toggling
+      let items = groupedMenu[rName].sort((a,b) => (a.item||'').localeCompare(b.item||'', undefined, {sensitivity: 'base'}));
+      items.forEach(m => {
+        let r = parseFloat(String(m.rate).replace(/[^\d.-]/g, '')); r = isNaN(r) ? 0 : r;
+        // Check initial display state based on collapsed state
+        let displayStyle = isCollapsed ? 'display: none;' : 'display: table-row;';
+        
+        tbody.innerHTML += `
+        <tr class="menu-item-row hover:bg-[#1e212b] transition-colors border-b border-slate-700/30 last:border-0" data-restaurant="${safeRName}" style="${displayStyle}">
+          <td class="px-4 py-2.5 text-slate-300 font-medium pl-8 w-[50%]">» ${esc(m.item)}</td>
+          <td class="px-4 py-2.5 text-right font-bold text-slate-100">₹${r}</td>
+          <td class="px-4 py-2.5 text-center">
+            <div class="flex items-center justify-center gap-3">
+              <button onclick="event.stopPropagation(); editMenuItem('${m.__backendId}')" class="text-blue-400 hover:text-blue-300 p-1"><i data-lucide="pencil" style="width:16px;height:16px;"></i></button>
+              <button onclick="event.stopPropagation(); deleteMenuItem('${m.__backendId}')" class="text-slate-500 hover:text-red-500 p-1"><i data-lucide="trash-2" style="width:16px;height:16px;"></i></button>
+            </div>
+          </td>
+        </tr>`;
+      });
   });
   if (typeof lucide !== 'undefined') lucide.createIcons();
 };
-
 window.autoFillRate = function(inp) {
   const r = inp.closest('.item-row'), b = inp.closest('.rest-block'); if(!r || !b) return;
   const rest = b.querySelector('.rest-name').value.trim().toLowerCase(), item = inp.value.trim().toLowerCase(), rInp = r.querySelector('.item-rate');
@@ -229,7 +277,6 @@ window.handleFullEditSubmit = async function(event) {
   if (event) event.preventDefault(); 
   const btn = $('edit-save-btn'); 
   if(btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.textContent = 'Saving...'; }
-  
   try {
     let finalItems = [];
     document.querySelectorAll('#edit-restaurants-wrapper .rest-block').forEach(b => {
@@ -237,16 +284,12 @@ window.handleFullEditSubmit = async function(event) {
       if(rName) { b.querySelectorAll('.item-row').forEach(row => { const bId = row.dataset.backendId || null, name = row.querySelector('.item-name').value.trim(), rate = parseFloat(row.querySelector('.item-rate').value) || 0, qty = parseFloat(row.querySelector('.item-qty').value) || 1; if(name && rate >= 0) finalItems.push({ __backendId: bId, name, rate, qty, total: rate*qty, restaurant: rName }); }); }
     });
     if(finalItems.length === 0) throw new Error("At least one item is required!");
-    
     const pMode = $('edit-payment-status').value, addr = $('edit-address').value.trim(), cont = $('edit-contact').value.trim(), rider = $('edit-rider').value.trim(), shift = $('edit-shift').value, dChg = parseFloat($('edit-del-charge').value) || 0;
     if(!pMode) throw new Error("Select Payment Mode!"); if(!addr) throw new Error("Delivery Address required!");
-    
     let fPMode = pMode;
     if(pMode === 'Split') { let sC = (parseFloat($('edit-split-cash').value) || 0) + dChg, sU = parseFloat($('edit-split-upi').value) || 0; fPMode = `Split: Cash ₹${sC.toFixed(2)} | UPI ₹${sU.toFixed(2)}`; }
     let sIds = finalItems.map(i => i.__backendId).filter(id => id !== null), oIds = originalOrderItems.map(i => i.__backendId), delIds = oIds.filter(id => !sIds.includes(id));
-    
     for(let id of delIds) { await dbOrders.child(id).remove(); }
-    
     const oDate = originalOrderItems[0].date || getLocalIsoDate(); let isFirst = true;
     for(let i of finalItems) {
       let stat = "Payment Pending"; if(pMode === "UPI Done" || pMode === "Cash" || pMode === "Split") stat = "Delivered";
@@ -254,24 +297,15 @@ window.handleFullEditSubmit = async function(event) {
       if(i.__backendId) { await dbOrders.child(i.__backendId).update(iData); } else { await dbOrders.push().set(iData); }
       isFirst = false;
     }
-    
-    toggleEditModal(false);
-    showToast('✅ Order Updated successfully!'); 
-    
-  } catch (err) { 
-      showToast('❌ ' + err.message, 'error'); 
-  } finally { 
-      if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Save Update'; } 
-  }
+    toggleEditModal(false); showToast('✅ Order Updated successfully!');
+  } catch (err) { showToast('❌ ' + err.message, 'error'); } finally { if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Save Update'; } }
 };
 
-
-// --- YAHAN SABSE BADA FIX HAI: NEW ORDER BUTTON PAR FULL WIPE CLEAN ---
+// --- NEW ORDER LOGIC ---
 window.openNewOrderModal = function() {
     const form = $('new-premium-order-form');
-    if (form) form.reset(); // Pehle default form clean karo
+    if (form) form.reset(); 
     
-    // Phir purane restaurant blocks aur items ko hata kar ek naya fresh box banao
     const wrapper = $('restaurants-wrapper');
     if (wrapper) {
         wrapper.innerHTML = `
@@ -301,14 +335,11 @@ window.openNewOrderModal = function() {
         </div>`;
     }
     premRestCount = 1;
-    
-    // Purane totals ko 0.00 karo aur extra fields chhupao
     if($('p-grand-total')) $('p-grand-total').textContent = '₹0';
     if($('p-subtotal')) $('p-subtotal').textContent = '₹0';
     if($('p-delivery-display')) $('p-delivery-display').textContent = '₹0';
     if($('split-inputs')) $('split-inputs').classList.add('hidden');
     
-    // Ab Modal Kholo
     toggleModal(true);
 };
 
