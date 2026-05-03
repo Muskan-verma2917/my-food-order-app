@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 8.3 Loaded! Perfect Calculation Math Applied.");
+console.log("App Version 9.1 Loaded! 10-Day Report Engine Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -23,11 +23,9 @@ function getLocalIsoDate() {
 
 let allOrders = [], menuList = [], depositedCashData = {}, currentTotalCash = 0, cashSaveTimeout, editingMenuId = null; 
 let currentlyEditingOrderId = null, originalOrderItems = [], editRestCount = 0;
-
 let currentFilterDate = ''; 
 let currentShiftFilter = 'All', currentTableFilter = 'All', currentRestFilter = 'All', currentRiderFilter = 'All';
 let orderCounter = 0, pendingDelete = null;
-
 let menuCollapsedState = {};
 
 const defaultConfig = { app_title: 'Daily Delivery Sales', background_color: '#0f1117', primary_action_color: '#e85d3a' };
@@ -38,7 +36,8 @@ if ($('date-filter')) $('date-filter').value = '';
 dbOrders.on('value', (snapshot) => {
   const data = snapshot.val(); allOrders = [];
   if (data) { Object.keys(data).forEach(key => { allOrders.push({ __backendId: key, ...data[key] }); }); }
-  updateStats(); renderOrders();
+  updateStats(); renderOrders(); 
+  if(!$('report-modal').classList.contains('hidden')) populateReportDropdown();
 });
 dbCounter.on('value', (snapshot) => { orderCounter = snapshot.val() || 0; });
 dbMenu.on('value', (snapshot) => {
@@ -93,10 +92,87 @@ window.toggleMenuModal = function(show) {
     if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; if (typeof lucide !== 'undefined') lucide.createIcons(); } else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; cancelMenuEdit(); } 
 };
 
+// --- NAYA REPORT LOGIC 📈 ---
+window.toggleReportModal = function(show) {
+    const modal = $('report-modal'); if(!modal) return;
+    if(show) {
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        populateReportDropdown();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    } else {
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+};
+
+function populateReportDropdown() {
+    const sel = $('report-rest-select'); if(!sel) return;
+    const rests = new Set();
+    allOrders.forEach(o => { if(o.customer_name) rests.add(o.customer_name.trim()); });
+    
+    const currVal = sel.value;
+    sel.innerHTML = '<option value="">-- Choose Restaurant --</option>';
+    Array.from(rests).filter(Boolean).sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'})).forEach(r => {
+        const opt = document.createElement('option'); opt.value = r; opt.textContent = r; sel.appendChild(opt);
+    });
+    if(Array.from(rests).includes(currVal)) sel.value = currVal;
+    generateTenDayReport();
+}
+
+window.generateTenDayReport = function() {
+    const sel = $('report-rest-select');
+    const tbody = $('report-table-body');
+    const totalEl = $('report-grand-total');
+    if(!sel || !tbody || !totalEl) return;
+    
+    const rName = sel.value;
+    if(!rName) {
+        tbody.innerHTML = '<tr><td colspan="2" class="text-center py-8 text-slate-500 italic">Select a restaurant above to view sales</td></tr>';
+        totalEl.textContent = '₹0.00';
+        return;
+    }
+
+    const dates = [];
+    for(let i=0; i<10; i++) {
+        let d = new Date();
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        d.setDate(d.getDate() - i);
+        dates.push(d.toISOString().slice(0, 10));
+    }
+
+    let grandTotal = 0; let html = '';
+
+    dates.forEach(dateStr => {
+        let dailyTotal = 0;
+        allOrders.forEach(o => {
+            if(o.status !== 'Cancelled' && o.date && o.date.slice(0,10) === dateStr) {
+                if((o.customer_name || '').trim().toLowerCase() === rName.toLowerCase()) {
+                    dailyTotal += (parseFloat(o.total) || 0); 
+                }
+            }
+        });
+
+        let displayDate = new Date(dateStr).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+        
+        html += `
+        <tr class="hover:bg-[#1e212b] transition-colors">
+          <td class="px-5 py-3 text-slate-300 font-medium">${displayDate}</td>
+          <td class="px-5 py-3 text-right font-bold ${dailyTotal > 0 ? 'text-[#ff5a36]' : 'text-slate-500'}">₹${dailyTotal.toLocaleString('en-IN', {minimumFractionDigits:2})}</td>
+        </tr>
+        `;
+        grandTotal += dailyTotal;
+    });
+
+    tbody.innerHTML = html;
+    totalEl.textContent = '₹' + grandTotal.toLocaleString('en-IN', {minimumFractionDigits:2});
+};
+
 document.addEventListener('DOMContentLoaded', function() {
   $('form-modal')?.addEventListener('click', e => { if (e.target === $('form-modal')) toggleModal(false); });
   $('edit-modal')?.addEventListener('click', e => { if (e.target === $('edit-modal')) toggleEditModal(false); });
   $('menu-modal')?.addEventListener('click', e => { if (e.target === $('menu-modal')) toggleMenuModal(false); });
+  $('report-modal')?.addEventListener('click', e => { if (e.target === $('report-modal')) toggleReportModal(false); });
 });
 
 window.handleMenuSubmit = async function(event) {
@@ -257,14 +333,12 @@ window.handleFullEditSubmit = async function(event) {
     if(finalItems.length === 0) throw new Error("At least one item is required!");
     const pMode = $('edit-payment-status').value, addr = $('edit-address').value.trim(), cont = $('edit-contact').value.trim(), rider = $('edit-rider').value.trim(), shift = $('edit-shift').value, dChg = parseFloat($('edit-del-charge').value) || 0;
     if(!pMode) throw new Error("Select Payment Mode!"); if(!addr) throw new Error("Delivery Address required!");
-    
     let fPMode = pMode;
     if(pMode === 'Split') { 
         let sC = (parseFloat($('edit-split-cash').value) || 0) + dChg;
         let sU = parseFloat($('edit-split-upi').value) || 0; 
         fPMode = `Split: Cash ₹${sC.toFixed(2)} | UPI ₹${sU.toFixed(2)}`; 
     }
-    
     let sIds = finalItems.map(i => i.__backendId).filter(id => id !== null), oIds = originalOrderItems.map(i => i.__backendId), delIds = oIds.filter(id => !sIds.includes(id));
     for(let id of delIds) { await dbOrders.child(id).remove(); }
     const oDate = originalOrderItems[0].date || getLocalIsoDate(); let isFirst = true;
@@ -282,11 +356,9 @@ window.handleFullEditSubmit = async function(event) {
   } catch (err) { showToast('❌ ' + err.message, 'error'); } finally { if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Save Update'; } }
 };
 
-// --- NEW ORDER LOGIC ---
 window.openNewOrderModal = function() {
     const form = $('new-premium-order-form');
     if (form) form.reset(); 
-    
     const wrapper = $('restaurants-wrapper');
     if (wrapper) {
         wrapper.innerHTML = `
@@ -320,7 +392,6 @@ window.openNewOrderModal = function() {
     if($('p-subtotal')) $('p-subtotal').textContent = '₹0';
     if($('p-delivery-display')) $('p-delivery-display').textContent = '₹0';
     if($('split-inputs')) $('split-inputs').classList.add('hidden');
-    
     toggleModal(true);
 };
 
@@ -398,8 +469,6 @@ window.requestDelete = function(bId) { pendingDelete = bId; renderOrders(); };
 window.cancelDelete = function() { pendingDelete = null; renderOrders(); };
 window.confirmDelete = async function(bId) { await dbOrders.child(bId).remove(); pendingDelete = null; showToast('Order deleted from Cloud'); };
 
-
-// --- 🚀 YAHAN BHI EK NAYA JADOOI LOGIC HAI JISE "ORDER GROUPING" KEHTE HAIN 🚀 ---
 window.filterData = function() { currentFilterDate = $('date-filter').value; currentShiftFilter = $('shift-filter') ? $('shift-filter').value : 'All'; currentRestFilter = $('filter-restaurant') ? $('filter-restaurant').value : 'All'; currentRiderFilter = $('filter-rider') ? $('filter-rider').value : 'All'; updateStats(); renderOrders(); }
 function countUniqueOrders(arr) { let s = new Set(); arr.forEach(o => s.add(o.order_id || o.__backendId)); return s.size; }
 
@@ -429,48 +498,41 @@ function updateStats() {
 
   let upiTotal = 0, cashTotal = 0, pendingTotal = 0, pureSales = 0, totalWithDelivery = 0;
   
-  // YAHAN ORDER KO PACK KARKE EK SATH GIN-NA SHURU KIYA
-  let ordersMap = {};
+  let ordersGroup = {};
 
   filteredData.forEach(o => {
     if (o.status === 'Cancelled') return;
     
     const itemTotal = parseFloat(o.total) || 0;
     const delCharge = parseFloat(o.delivery_charge) || 0;
-    const orderTotalWithDel = itemTotal + delCharge;
+    const rowTotal = itemTotal + delCharge;
     
     pureSales += itemTotal; 
-    totalWithDelivery += orderTotalWithDel;
-    
-    let oId = o.order_id || o.__backendId; 
-    if (!ordersMap[oId]) {
-        ordersMap[oId] = { itemsTotal: 0, status: o.payment_status || "" };
-    }
-    ordersMap[oId].itemsTotal += orderTotalWithDel;
+    totalWithDelivery += rowTotal;
 
-    // Asli Split ki value dhund nikalna 
-    if ((o.payment_status || "").includes('Split:')) {
-        ordersMap[oId].status = o.payment_status; 
+    let oId = o.order_id || o.__backendId;
+    if (!ordersGroup[oId]) {
+        ordersGroup[oId] = { totalValue: 0, status: o.payment_status || "" };
+    }
+    
+    ordersGroup[oId].totalValue += rowTotal;
+    
+    if ((o.payment_status || "").includes("Cash ₹")) {
+        ordersGroup[oId].status = o.payment_status;
     }
   });
 
-  // AB DOUBLE HONE KA KOI CHANCE NAHI. HAR ORDER KA PAISE SIRF 1 BAAR JUDEGA!
-  Object.values(ordersMap).forEach(grp => {
-     let status = grp.status;
-     
-     if (status === 'UPI Done') { upiTotal += grp.itemsTotal; }
-     else if (status === 'Cash') { cashTotal += grp.itemsTotal; }
-     else if (status === 'Payment Pending') { pendingTotal += grp.itemsTotal; }
-     else if (status.includes('Split')) {
-         const cashMatch = status.match(/Cash ₹([\d.]+)/);
-         const upiMatch = status.match(/UPI ₹([\d.]+)/);
-         
-         let splitCash = cashMatch ? parseFloat(cashMatch[1]) : 0;
-         let splitUpi = upiMatch ? parseFloat(upiMatch[1]) : 0;
-         
-         cashTotal += splitCash;
-         upiTotal += splitUpi;
-     }
+  Object.values(ordersGroup).forEach(grp => {
+      let stat = grp.status;
+      if (stat === 'UPI Done') { upiTotal += grp.totalValue; }
+      else if (stat === 'Cash') { cashTotal += grp.totalValue; }
+      else if (stat === 'Payment Pending') { pendingTotal += grp.totalValue; }
+      else if (stat.includes('Split')) {
+          const cashMatch = stat.match(/Cash ₹([\d.]+)/);
+          const upiMatch = stat.match(/UPI ₹([\d.]+)/);
+          cashTotal += cashMatch ? parseFloat(cashMatch[1]) : 0;
+          upiTotal += upiMatch ? parseFloat(upiMatch[1]) : 0;
+      }
   });
 
   const activeOrders = filteredData.filter(o => o.status !== 'Cancelled'), deliveredCashOrders = activeOrders.filter(o => o.payment_status === 'Cash' || (o.payment_status || '').includes('Split')), deliveredUpiOrders = activeOrders.filter(o => o.payment_status === 'UPI Done' || (o.payment_status || '').includes('Split')), allDeliveredOrders = activeOrders.filter(o => o.status === 'Delivered'), pendingOrders = activeOrders.filter(o => o.payment_status === 'Payment Pending');
