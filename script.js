@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 8.1 Loaded! Split Payment Bug Fixed.");
+console.log("App Version 8.3 Loaded! Perfect Calculation Math Applied.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -131,11 +131,7 @@ window.toggleMenuGroup = function(rName) {
     menuCollapsedState[rName] = !menuCollapsedState[rName];
     const rows = document.querySelectorAll(`.menu-item-row[data-restaurant="${rName}"]`);
     const icon = document.getElementById(`icon-${rName}`);
-    
-    rows.forEach(row => {
-        if (menuCollapsedState[rName]) { row.style.display = 'none'; } else { row.style.display = 'table-row'; }
-    });
-
+    rows.forEach(row => { if (menuCollapsedState[rName]) { row.style.display = 'none'; } else { row.style.display = 'table-row'; } });
     if (icon) {
         if (menuCollapsedState[rName]) { icon.setAttribute('data-lucide', 'chevron-right'); } else { icon.setAttribute('data-lucide', 'chevron-down'); }
         if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -196,7 +192,6 @@ window.autoFillRate = function(inp) {
 };
 window.autoFillAllItemsInBlock = function(rInp) { const b = rInp.closest('.rest-block'); if(!b) return; b.querySelectorAll('.item-name').forEach(i => autoFillRate(i)); };
 
-// --- EDIT ORDER LOGIC (YAHAN FIX KIYA HAI KI SPLIT DOUBLE NA HO) ---
 window.toggleEditSplitFields = function() { const mode = $('edit-payment-status').value; if (mode === 'Split') $('edit-split-inputs').classList.remove('hidden'); else $('edit-split-inputs').classList.add('hidden'); };
 window.addEditItem = function(rId) {
   const c = document.getElementById(`edit-items-rest-${rId}`), d = document.createElement('div'); d.className = 'item-row flex gap-2 items-start';
@@ -224,14 +219,11 @@ window.openEditModal = function(backendId) {
   $('edit-address').value = first.address || ''; $('edit-contact').value = first.contact || ''; $('edit-rider').value = first.rider || ''; $('edit-shift').value = first.shift || 'Before Lunch';
   let tDel = 0; originalOrderItems.forEach(o => tDel += (parseFloat(o.delivery_charge) || 0)); $('edit-del-charge').value = tDel;
   
-  // FIXED SPLIT EXTRACTION: Ab delivery charge ko theek se minus karega
   let pStatus = first.payment_status || '';
   if (pStatus.includes('Split')) { 
       $('edit-payment-status').value = 'Split'; 
       let totalSplitCash = pStatus.match(/Cash ₹([\d.]+)/) ? parseFloat(pStatus.match(/Cash ₹([\d.]+)/)[1]) : 0;
       let totalSplitUpi = pStatus.match(/UPI ₹([\d.]+)/) ? parseFloat(pStatus.match(/UPI ₹([\d.]+)/)[1]) : 0; 
-      
-      // Delivery charge is usually embedded in the Cash amount of Split.
       $('edit-split-cash').value = Math.max(0, totalSplitCash - tDel); 
       $('edit-split-upi').value = totalSplitUpi; 
       $('edit-split-inputs').classList.remove('hidden'); 
@@ -263,12 +255,10 @@ window.handleFullEditSubmit = async function(event) {
       if(rName) { b.querySelectorAll('.item-row').forEach(row => { const bId = row.dataset.backendId || null, name = row.querySelector('.item-name').value.trim(), rate = parseFloat(row.querySelector('.item-rate').value) || 0, qty = parseFloat(row.querySelector('.item-qty').value) || 1; if(name && rate >= 0) finalItems.push({ __backendId: bId, name, rate, qty, total: rate*qty, restaurant: rName }); }); }
     });
     if(finalItems.length === 0) throw new Error("At least one item is required!");
-    
     const pMode = $('edit-payment-status').value, addr = $('edit-address').value.trim(), cont = $('edit-contact').value.trim(), rider = $('edit-rider').value.trim(), shift = $('edit-shift').value, dChg = parseFloat($('edit-del-charge').value) || 0;
     if(!pMode) throw new Error("Select Payment Mode!"); if(!addr) throw new Error("Delivery Address required!");
     
     let fPMode = pMode;
-    // YAHAN FIX HAI: Delivery charge sirf order mein ek baar add hoga
     if(pMode === 'Split') { 
         let sC = (parseFloat($('edit-split-cash').value) || 0) + dChg;
         let sU = parseFloat($('edit-split-upi').value) || 0; 
@@ -277,46 +267,14 @@ window.handleFullEditSubmit = async function(event) {
     
     let sIds = finalItems.map(i => i.__backendId).filter(id => id !== null), oIds = originalOrderItems.map(i => i.__backendId), delIds = oIds.filter(id => !sIds.includes(id));
     for(let id of delIds) { await dbOrders.child(id).remove(); }
-    const oDate = originalOrderItems[0].date || getLocalIsoDate(); 
-    
-    // YAHAN BHI FIX HAI: isFirst tag ko use karke multiple items me bug theek hoga
-    let isFirst = true;
+    const oDate = originalOrderItems[0].date || getLocalIsoDate(); let isFirst = true;
     for(let i of finalItems) {
       let stat = "Payment Pending"; if(pMode === "UPI Done" || pMode === "Cash" || pMode === "Split") stat = "Delivered";
-      
-      // Har item par split amount nahi bhejenge backend par taaki dashboard double na gine
       let itemPaymentStatus = isFirst ? fPMode : pMode; 
-      
-      let iData = { 
-          order_id: currentlyEditingOrderId, 
-          customer_name: i.restaurant, 
-          item_name: i.name, 
-          quantity: i.qty, 
-          unit_price: i.rate, 
-          total: i.total, 
-          status: stat, 
-          date: oDate, 
-          shift: shift, 
-          address: addr, 
-          customer_address: addr, 
-          location: addr, 
-          
-          // Is item ka actual mode kya dikhana hai
-          payment_status: fPMode, 
-          
-          contact: cont, 
-          rider: rider, 
-          delivery_charge: isFirst ? dChg : 0 
-      };
-      
-      // But split tracking for dashboard is special, it reads from the string.
-      // Firebase doesn't auto-sum strings, but our JS loop does.
-      // So if 5 items have the same string "Split Cash 350", JS loop adds it 5 times.
-      // The safest way is to clear the string for subsequent items if it's split.
       if (fPMode.includes('Split') && !isFirst) {
-          iData.payment_status = "Split (Included in total)";
+          itemPaymentStatus = "Split (Included in total)";
       }
-
+      let iData = { order_id: currentlyEditingOrderId, customer_name: i.restaurant, item_name: i.name, quantity: i.qty, unit_price: i.rate, total: i.total, status: stat, date: oDate, shift: shift, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? dChg : 0 };
       if(i.__backendId) { await dbOrders.child(i.__backendId).update(iData); } else { await dbOrders.push().set(iData); }
       isFirst = false;
     }
@@ -440,7 +398,8 @@ window.requestDelete = function(bId) { pendingDelete = bId; renderOrders(); };
 window.cancelDelete = function() { pendingDelete = null; renderOrders(); };
 window.confirmDelete = async function(bId) { await dbOrders.child(bId).remove(); pendingDelete = null; showToast('Order deleted from Cloud'); };
 
-// --- RENDER AND STATS FUNCTIONS ---
+
+// --- 🚀 YAHAN BHI EK NAYA JADOOI LOGIC HAI JISE "ORDER GROUPING" KEHTE HAIN 🚀 ---
 window.filterData = function() { currentFilterDate = $('date-filter').value; currentShiftFilter = $('shift-filter') ? $('shift-filter').value : 'All'; currentRestFilter = $('filter-restaurant') ? $('filter-restaurant').value : 'All'; currentRiderFilter = $('filter-rider') ? $('filter-rider').value : 'All'; updateStats(); renderOrders(); }
 function countUniqueOrders(arr) { let s = new Set(); arr.forEach(o => s.add(o.order_id || o.__backendId)); return s.size; }
 
@@ -469,11 +428,49 @@ function updateStats() {
   const filteredData = baseFilteredData.filter(o => { const isRestMatch = currentRestFilter === 'All' || (o.customer_name || '').trim() === currentRestFilter; const isRiderMatch = currentRiderFilter === 'All' || (o.rider || '').trim() === currentRiderFilter; return isRestMatch && isRiderMatch; });
 
   let upiTotal = 0, cashTotal = 0, pendingTotal = 0, pureSales = 0, totalWithDelivery = 0;
+  
+  // YAHAN ORDER KO PACK KARKE EK SATH GIN-NA SHURU KIYA
+  let ordersMap = {};
+
   filteredData.forEach(o => {
     if (o.status === 'Cancelled') return;
-    const itemTotal = parseFloat(o.total) || 0, delCharge = parseFloat(o.delivery_charge) || 0, status = o.payment_status || "", orderTotalWithDel = itemTotal + delCharge;
-    pureSales += itemTotal; totalWithDelivery += orderTotalWithDel;
-    if (status === 'UPI Done') { upiTotal += orderTotalWithDel; } else if (status === 'Cash') { cashTotal += orderTotalWithDel; } else if (status === 'Payment Pending') { pendingTotal += orderTotalWithDel; } else if (status.includes('Split')) { const cashMatch = status.match(/Cash ₹([\d.]+)/), upiMatch = status.match(/UPI ₹([\d.]+)/); let splitCash = cashMatch ? parseFloat(cashMatch[1]) : 0, splitUpi = upiMatch ? parseFloat(upiMatch[1]) : 0; cashTotal += splitCash; upiTotal += splitUpi; }
+    
+    const itemTotal = parseFloat(o.total) || 0;
+    const delCharge = parseFloat(o.delivery_charge) || 0;
+    const orderTotalWithDel = itemTotal + delCharge;
+    
+    pureSales += itemTotal; 
+    totalWithDelivery += orderTotalWithDel;
+    
+    let oId = o.order_id || o.__backendId; 
+    if (!ordersMap[oId]) {
+        ordersMap[oId] = { itemsTotal: 0, status: o.payment_status || "" };
+    }
+    ordersMap[oId].itemsTotal += orderTotalWithDel;
+
+    // Asli Split ki value dhund nikalna 
+    if ((o.payment_status || "").includes('Split:')) {
+        ordersMap[oId].status = o.payment_status; 
+    }
+  });
+
+  // AB DOUBLE HONE KA KOI CHANCE NAHI. HAR ORDER KA PAISE SIRF 1 BAAR JUDEGA!
+  Object.values(ordersMap).forEach(grp => {
+     let status = grp.status;
+     
+     if (status === 'UPI Done') { upiTotal += grp.itemsTotal; }
+     else if (status === 'Cash') { cashTotal += grp.itemsTotal; }
+     else if (status === 'Payment Pending') { pendingTotal += grp.itemsTotal; }
+     else if (status.includes('Split')) {
+         const cashMatch = status.match(/Cash ₹([\d.]+)/);
+         const upiMatch = status.match(/UPI ₹([\d.]+)/);
+         
+         let splitCash = cashMatch ? parseFloat(cashMatch[1]) : 0;
+         let splitUpi = upiMatch ? parseFloat(upiMatch[1]) : 0;
+         
+         cashTotal += splitCash;
+         upiTotal += splitUpi;
+     }
   });
 
   const activeOrders = filteredData.filter(o => o.status !== 'Cancelled'), deliveredCashOrders = activeOrders.filter(o => o.payment_status === 'Cash' || (o.payment_status || '').includes('Split')), deliveredUpiOrders = activeOrders.filter(o => o.payment_status === 'UPI Done' || (o.payment_status || '').includes('Split')), allDeliveredOrders = activeOrders.filter(o => o.status === 'Delivered'), pendingOrders = activeOrders.filter(o => o.payment_status === 'Payment Pending');
@@ -545,7 +542,6 @@ function createRow(order) {
   const statusColor = (order.payment_status === 'UPI Done') ? '#3b82f6' : (order.payment_status === 'Payment Pending') ? '#f59e0b' : (order.payment_status === 'Cash') ? '#10b981' : (order.payment_status && order.payment_status.includes('Split')) ? '#a855f7' : '#6b7084';
   const shiftBadge = order.shift === 'After Lunch' ? '🌙' : (order.shift === 'Before Lunch' ? '☀️' : '');
 
-  // Clean split display text so it doesn't show confusing duplicates in the table dropdown
   let displayPaymentStatus = order.payment_status || '';
   if (displayPaymentStatus === "Split (Included in total)") {
       displayPaymentStatus = "Delivered (Split)";
