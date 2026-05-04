@@ -15,13 +15,12 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 10.0 Loaded! Master Update & Safety Fixes Applied.");
+console.log("App Version 11.0 Loaded! Dropdown Populating Safely.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
 }
 
-// ALERTS & TOASTS FIX
 window.showToast = function(msg, type = 'success') {
     const container = document.getElementById('toast-container');
     if(!container) { alert(msg); return; }
@@ -49,10 +48,9 @@ dbOrders.on('value', (snapshot) => {
       const data = snapshot.val(); allOrders = [];
       if (data) { Object.keys(data).forEach(key => { allOrders.push({ __backendId: key, ...data[key] }); }); }
       updateStats(); renderOrders(); 
-      if($('report-modal') && !$('report-modal').classList.contains('hidden')) populateReportDropdown();
+      if($('report-modal') && !$('report-modal').classList.contains('hidden')) window.populateReportDropdown();
   } catch (error) {
       console.error("Dashboard Load Error:", error);
-      showToast("System Error: " + error.message, 'error');
   }
 });
 
@@ -109,7 +107,7 @@ window.toggleMenuModal = function(show) {
     if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; if (typeof lucide !== 'undefined') lucide.createIcons(); } else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; cancelMenuEdit(); } 
 };
 
-// --- CUSTOM DATE RANGE REPORT LOGIC 📈 ---
+// --- YAHAN SE SAB KUCH SAHI SE LOAD HOGA ---
 window.toggleReportModal = function(show) {
     const modal = $('report-modal'); if(!modal) return;
     if(show) {
@@ -120,10 +118,10 @@ window.toggleReportModal = function(show) {
         let startD = new Date(); startD.setMinutes(startD.getMinutes() - startD.getTimezoneOffset());
         startD.setDate(startD.getDate() - 9); 
         
-        $('report-end-date').value = endD.toISOString().slice(0, 10);
-        $('report-start-date').value = startD.toISOString().slice(0, 10);
+        if ($('report-end-date')) $('report-end-date').value = endD.toISOString().slice(0, 10);
+        if ($('report-start-date')) $('report-start-date').value = startD.toISOString().slice(0, 10);
 
-        populateReportDropdown();
+        window.populateReportDropdown();
         if (typeof lucide !== 'undefined') lucide.createIcons();
     } else {
         modal.classList.add('hidden');
@@ -131,26 +129,39 @@ window.toggleReportModal = function(show) {
     }
 };
 
-function populateReportDropdown() {
-    const sel = $('report-rest-select'); if(!sel) return;
+window.populateReportDropdown = function() {
+    const sel = document.getElementById('report-rest-select'); 
+    if(!sel) return;
+    
     const rests = new Set();
-    allOrders.forEach(o => { if(o.customer_name) rests.add(String(o.customer_name).trim()); });
+    allOrders.forEach(o => { 
+        if(o && o.customer_name) {
+            rests.add(String(o.customer_name).trim()); 
+        }
+    });
     
     const currVal = sel.value;
     sel.innerHTML = '<option value="">-- Choose Restaurant --</option>';
-    Array.from(rests).filter(Boolean).sort((a,b)=>String(a).localeCompare(String(b),undefined,{sensitivity:'base'})).forEach(r => {
-        const opt = document.createElement('option'); opt.value = r; opt.textContent = r; sel.appendChild(opt);
+    
+    Array.from(rests).filter(Boolean).sort().forEach(r => {
+        const opt = document.createElement('option'); 
+        opt.value = r; 
+        opt.textContent = r; 
+        sel.appendChild(opt);
     });
+    
     if(Array.from(rests).includes(currVal)) sel.value = currVal;
+    
     if(typeof generateCustomReport === 'function') generateCustomReport(); 
-}
+};
 
 window.generateCustomReport = function() {
     const sel = $('report-rest-select');
     const tbody = $('report-table-body');
     const totalEl = $('report-grand-total');
-    const startInput = $('report-start-date').value;
-    const endInput = $('report-end-date').value;
+    
+    const startInputEl = $('report-start-date');
+    const endInputEl = $('report-end-date');
 
     if(!sel || !tbody || !totalEl) return;
     
@@ -161,10 +172,15 @@ window.generateCustomReport = function() {
         return;
     }
 
-    if(!startInput || !endInput) {
-        tbody.innerHTML = '<tr><td colspan="2" class="text-center py-8 text-slate-500 italic">Please select both Start and End dates</td></tr>';
-        totalEl.textContent = '₹0.00';
-        return;
+    let startInput = startInputEl ? startInputEl.value : null;
+    let endInput = endInputEl ? endInputEl.value : null;
+
+    if (!startInput || !endInput) {
+        let endD = new Date(); endD.setMinutes(endD.getMinutes() - endD.getTimezoneOffset());
+        let startD = new Date(); startD.setMinutes(startD.getMinutes() - startD.getTimezoneOffset());
+        startD.setDate(startD.getDate() - 9);
+        startInput = startD.toISOString().slice(0, 10);
+        endInput = endD.toISOString().slice(0, 10);
     }
 
     let start = new Date(startInput);

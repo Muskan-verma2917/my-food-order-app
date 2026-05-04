@@ -8,8 +8,8 @@
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
   
-  <!-- VERSION 910: 10-Day Report Feature -->
-  <link rel="stylesheet" href="style.css?v=910">
+  <!-- VERSION 13.0 (Strict Cache Buster) -->
+  <link rel="stylesheet" href="style.css?v=130">
   <link rel="manifest" href="manifest.json">
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -26,13 +26,14 @@
     <div class="flex items-center gap-3 w-full lg:w-auto justify-center lg:justify-start">
      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:#e85d3a;"><i data-lucide="utensils" style="width:18px;height:18px;color:#fff;"></i></div>
      <h1 id="app-title" class="text-lg sm:text-xl font-bold flex items-center gap-2" style="font-family:'Playfair Display',serif;">
-       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v9.1</span>
+       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v13.0</span>
      </h1>
     </div>
     
     <div class="flex flex-wrap items-center justify-center gap-2 lg:gap-3 w-full lg:w-auto">
      <div class="flex items-center gap-2 text-slate-400 bg-[#1e212b] px-3 py-2 rounded-lg border border-slate-700/50 hover:border-slate-500 transition-colors">
       <input type="date" id="date-filter" class="bg-transparent text-sm font-medium text-slate-200 outline-none cursor-pointer [color-scheme:dark]" onchange="filterData()">
+      <button onclick="document.getElementById('date-filter').value=''; filterData();" class="hover:text-[#ff5a36] font-bold px-1 text-sm" title="Clear Date Filter">✕</button>
      </div>
      
      <div class="flex items-center gap-2 text-slate-400 bg-[#1e212b] px-3 py-2 rounded-lg border border-slate-700/50 hover:border-slate-500 transition-colors">
@@ -199,22 +200,34 @@
    </main>
   </div>
 
-  <!-- NAYA 10-DAY REPORT MODAL -->
+  <!-- ✅ YAHAN HAI NAYA DATE RANGE WALA REPORT MODAL ✅ -->
   <div id="report-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-   <div class="relative w-full max-w-xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl" style="background:#181a24; border:1px solid #1e2030;">
+   <div class="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl" style="background:#181a24; border:1px solid #1e2030;">
     <button onclick="toggleReportModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl z-10">✕</button>
     <div class="p-6 border-b border-slate-700 bg-[#1e212b] rounded-t-2xl">
       <h2 class="text-xl font-bold flex items-center gap-2" style="color:#f0ece4; font-family:'Playfair Display',serif;">
-        <i data-lucide="bar-chart-2" style="color:#ff5a36;"></i> 10-Day Sales Report
+        <i data-lucide="bar-chart-2" style="color:#ff5a36;"></i> Custom Sales Report
       </h2>
-      <p class="text-xs text-slate-400 mt-1">Check the pure item sales performance for any restaurant.</p>
+      <p class="text-xs text-slate-400 mt-1">Check pure item sales performance for any restaurant within a date range.</p>
     </div>
     <div class="p-6 overflow-y-auto flex-1">
-      <div class="mb-5">
-        <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Select Restaurant</label>
-        <select id="report-rest-select" onchange="generateTenDayReport()" class="w-full bg-[#16181f] border border-slate-600 rounded-lg px-4 py-3 text-sm text-slate-200 focus:border-[#ff5a36] outline-none transition-colors cursor-pointer shadow-sm">
-          <option value="">-- Choose Restaurant --</option>
-        </select>
+      
+      <!-- Date Range Inputs (From and To) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        <div class="md:col-span-1">
+          <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Restaurant</label>
+          <select id="report-rest-select" onchange="generateCustomReport()" class="w-full bg-[#16181f] border border-slate-600 rounded-lg px-4 py-2.5 text-sm text-slate-200 focus:border-[#ff5a36] outline-none transition-colors cursor-pointer shadow-sm">
+            <option value="">-- Choose Restaurant --</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">From Date</label>
+          <input type="date" id="report-start-date" onchange="generateCustomReport()" class="w-full bg-[#16181f] border border-slate-600 rounded-lg px-4 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none transition-colors cursor-pointer shadow-sm [color-scheme:dark]">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">To Date</label>
+          <input type="date" id="report-end-date" onchange="generateCustomReport()" class="w-full bg-[#16181f] border border-slate-600 rounded-lg px-4 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none transition-colors cursor-pointer shadow-sm [color-scheme:dark]">
+        </div>
       </div>
       
       <div class="border border-slate-700 rounded-xl overflow-hidden shadow-sm">
@@ -230,7 +243,7 @@
           </tbody>
           <tfoot class="bg-[#1e212b] font-bold text-white border-t-2 border-slate-600">
             <tr>
-              <td class="px-5 py-4 text-right text-slate-300 uppercase tracking-wider text-xs">10-Day Total:</td>
+              <td class="px-5 py-4 text-right text-slate-300 uppercase tracking-wider text-xs">Total Sales:</td>
               <td class="px-5 py-4 text-right text-xl" style="color:#4ade80;" id="report-grand-total">₹0.00</td>
             </tr>
           </tfoot>
@@ -253,7 +266,6 @@
       <div class="p-6 overflow-y-auto flex-1">
         <div class="bg-[#16181f] p-4 rounded-xl border border-slate-700 mb-6 relative">
           <h3 id="menu-form-title" class="text-sm font-semibold mb-3 text-slate-300">Add New Menu Item</h3>
-          
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
             <div class="md:col-span-4"><label class="block text-[10px] text-slate-500 mb-1">Restaurant</label><input type="text" id="menu-rest-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
             <div class="md:col-span-5"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" id="menu-item-input" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none"></div>
@@ -265,10 +277,8 @@
               </div>
             </div>
           </div>
-          
         </div>
         <div class="mb-3"><div class="relative"><div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"><i data-lucide="search" class="w-4 h-4 text-slate-400"></i></div><input type="text" id="menu-search-input" class="w-full bg-[#16181f] border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-slate-200 focus:border-[#ff5a36] outline-none transition-colors" placeholder="Search by Restaurant or Item Name..." oninput="renderMenuTable()"></div></div>
-        
         <div class="border border-slate-700 rounded-xl overflow-hidden">
           <table class="w-full text-sm text-left">
             <thead class="bg-[#12141d] text-xs uppercase text-slate-500 tracking-wider">
@@ -278,9 +288,7 @@
                 <th class="px-4 py-3 text-center">Action</th>
               </tr>
             </thead>
-            <tbody id="menu-list-body" class="divide-y divide-slate-700/50">
-              <!-- JS SE DYNAMIC CONTENT BHAREGA -->
-            </tbody>
+            <tbody id="menu-list-body" class="divide-y divide-slate-700/50"></tbody>
           </table>
         </div>
       </div>
@@ -373,6 +381,6 @@
    </div>
   </div>
 
-  <script src="script.js?v=910"></script>
+  <script src="script.js?v=130"></script>
  </body>
 </html>
