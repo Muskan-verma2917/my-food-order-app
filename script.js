@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 11.0 Loaded! Dropdown Populating Safely.");
+console.log("App Version 13.1 Loaded! Custom Report with 'All Restaurants' Added.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -107,7 +107,6 @@ window.toggleMenuModal = function(show) {
     if (show) { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; if (typeof lucide !== 'undefined') lucide.createIcons(); } else { modal.classList.add('hidden'); document.body.style.overflow = 'auto'; cancelMenuEdit(); } 
 };
 
-// --- YAHAN SE SAB KUCH SAHI SE LOAD HOGA ---
 window.toggleReportModal = function(show) {
     const modal = $('report-modal'); if(!modal) return;
     if(show) {
@@ -141,7 +140,9 @@ window.populateReportDropdown = function() {
     });
     
     const currVal = sel.value;
-    sel.innerHTML = '<option value="">-- Choose Restaurant --</option>';
+    
+    // Add ALL option here
+    sel.innerHTML = '<option value="ALL">-- All Restaurants (Total) --</option>';
     
     Array.from(rests).filter(Boolean).sort().forEach(r => {
         const opt = document.createElement('option'); 
@@ -150,7 +151,11 @@ window.populateReportDropdown = function() {
         sel.appendChild(opt);
     });
     
-    if(Array.from(rests).includes(currVal)) sel.value = currVal;
+    if(Array.from(rests).includes(currVal) || currVal === "ALL") {
+         sel.value = currVal;
+    } else {
+         sel.value = "ALL"; // Default to All
+    }
     
     if(typeof generateCustomReport === 'function') generateCustomReport(); 
 };
@@ -165,7 +170,8 @@ window.generateCustomReport = function() {
 
     if(!sel || !tbody || !totalEl) return;
     
-    const rName = sel.value;
+    const rName = sel.value; // It could be "ALL" or a specific restaurant name
+    
     if(!rName) {
         tbody.innerHTML = '<tr><td colspan="2" class="text-center py-8 text-slate-500 italic">Select a restaurant above to view sales</td></tr>';
         totalEl.textContent = '₹0.00';
@@ -206,7 +212,8 @@ window.generateCustomReport = function() {
         let dailyTotal = 0;
         allOrders.forEach(o => {
             if(o.status !== 'Cancelled' && o.date && String(o.date).includes(dateStr)) {
-                if(String(o.customer_name || '').trim().toLowerCase() === String(rName).toLowerCase()) {
+                // If "ALL" is selected, just add all pure sales. If specific rest, filter by name.
+                if(rName === "ALL" || String(o.customer_name || '').trim().toLowerCase() === String(rName).toLowerCase()) {
                     dailyTotal += (parseFloat(o.total) || 0); 
                 }
             }
@@ -343,8 +350,8 @@ window.removeEditRest = function(btn) { btn.parentElement.remove(); calcEditTota
 
 window.calcEditTotal = function() {
   let tot = 0; document.querySelectorAll('#edit-restaurants-wrapper .item-row').forEach(r => { tot += ((parseFloat(r.querySelector('.item-rate').value) || 0) * (parseFloat(r.querySelector('.item-qty').value) || 0)); });
-  const del = parseFloat($('edit-del-charge').value) || 0, g = tot + del;
-  $('edit-subtotal').textContent = '₹' + tot.toLocaleString('en-IN', { minimumFractionDigits: 2 }); $('edit-delivery-display').textContent = '₹' + del.toLocaleString('en-IN', { minimumFractionDigits: 2 }); $('edit-grand-total').textContent = '₹' + g.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  const delCharge = parseFloat($('edit-del-charge').value) || 0; const grandTotal = total + delCharge;
+  $('edit-subtotal').textContent = '₹' + tot.toLocaleString('en-IN', { minimumFractionDigits: 2 }); $('edit-delivery-display').textContent = '₹' + delCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 }); $('edit-grand-total').textContent = '₹' + g.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 };
 
 window.openEditModal = function(backendId) {
