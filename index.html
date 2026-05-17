@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=140">
+  <link rel="stylesheet" href="style.css?v=150">
   <link rel="manifest" href="manifest.json">
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -25,7 +25,7 @@
     <div class="flex items-center gap-3 w-full lg:w-auto justify-center lg:justify-start">
      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:#e85d3a;"><i data-lucide="utensils" style="width:18px;height:18px;color:#fff;"></i></div>
      <h1 id="app-title" class="text-lg sm:text-xl font-bold flex items-center gap-2" style="font-family:'Playfair Display',serif;">
-       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v14.0</span>
+       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v15.0</span>
      </h1>
     </div>
     
@@ -41,6 +41,7 @@
         <option value="All" style="background:#1e212b;">Full Day</option>
         <option value="Before Lunch" style="background:#1e212b;">☀️ Before Lunch</option>
         <option value="After Lunch" style="background:#1e212b;">🌙 After Lunch</option>
+        <option value="No Lunch Break" style="background:#1e212b;">⚡ No Lunch Break</option>
       </select>
      </div>
      
@@ -311,7 +312,8 @@
       <div><label class="block text-xs font-medium text-slate-400 mb-1">Shift *</label> 
         <select id="edit-shift" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" style="background-color: #1e212b;"> 
           <option value="Before Lunch">☀️ Before Lunch</option> 
-          <option value="After Lunch">🌙 After Lunch</option> 
+          <option value="After Lunch">🌙 After Lunch</option>
+          <option value="No Lunch Break">⚡ No Lunch Break</option> 
         </select>
       </div>
      </div>
@@ -351,6 +353,7 @@
         <select id="p-shift" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" style="background-color: #1e212b;"> 
           <option value="Before Lunch">☀️ Before Lunch</option> 
           <option value="After Lunch">🌙 After Lunch</option> 
+          <option value="No Lunch Break">⚡ No Lunch Break</option> 
         </select>
       </div>
      </div>
@@ -364,6 +367,6 @@
    </div>
   </div>
 
-  <script src="script.js?v=140"></script>
+  <script src="script.js?v=150"></script>
  </body>
 </html>

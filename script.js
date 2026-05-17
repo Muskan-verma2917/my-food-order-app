@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 14.0 Loaded! Bulletproof Edit Modal Active.");
+console.log("App Version 15.0 Loaded! 'No Lunch Break' Shift Added.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -70,6 +70,7 @@ window.handleDepositedCashChange = function() {
   cashSaveTimeout = setTimeout(() => { const key = currentFilterDate + "_" + (currentShiftFilter.replace(/\s+/g, '')); dbDailyCash.child(key).set(val); }, 800);
 };
 
+// --- CASH DEPOSIT FIX FOR 3 SHIFTS ---
 window.updatePendingCashUI = function(inputVal = null) {
   const inputEl = $('deposited-cash-input'), labelEl = $('deposited-label'), display = $('pending-cash-display');
   if (!currentFilterDate) {
@@ -78,10 +79,15 @@ window.updatePendingCashUI = function(inputVal = null) {
   }
   const dateStr = currentFilterDate, shiftStr = currentShiftFilter.replace(/\s+/g, ''), key = dateStr + "_" + shiftStr;
   let deposited = inputVal;
+  
   if (currentShiftFilter === 'All') {
-    const beforeVal = parseFloat(depositedCashData[dateStr + "_BeforeLunch"]) || 0, afterVal = parseFloat(depositedCashData[dateStr + "_AfterLunch"]) || 0;
-    deposited = beforeVal + afterVal;
-    if (inputEl && labelEl) { inputEl.value = deposited || ''; inputEl.disabled = true; inputEl.parentElement.style.opacity = '0.5'; inputEl.parentElement.style.pointerEvents = 'none'; labelEl.textContent = 'Auto Sum (Both Shifts):'; labelEl.style.color = '#a855f7'; }
+    const beforeVal = parseFloat(depositedCashData[dateStr + "_BeforeLunch"]) || 0;
+    const afterVal = parseFloat(depositedCashData[dateStr + "_AfterLunch"]) || 0;
+    const noLunchVal = parseFloat(depositedCashData[dateStr + "_NoLunchBreak"]) || 0;
+    
+    deposited = beforeVal + afterVal + noLunchVal; // TEENO KA TOTAL
+    
+    if (inputEl && labelEl) { inputEl.value = deposited || ''; inputEl.disabled = true; inputEl.parentElement.style.opacity = '0.5'; inputEl.parentElement.style.pointerEvents = 'none'; labelEl.textContent = 'Auto Sum (All Shifts):'; labelEl.style.color = '#a855f7'; }
   } else {
     if (deposited === null) { deposited = depositedCashData[key] || 0; }
     if (inputEl && labelEl) { inputEl.value = deposited || ''; inputEl.disabled = false; inputEl.parentElement.style.opacity = '1'; inputEl.parentElement.style.pointerEvents = 'auto'; labelEl.textContent = 'Rider Deposited:'; labelEl.style.color = '#94a3b8'; }
@@ -328,8 +334,34 @@ window.autoFillRate = function(inp) {
 };
 window.autoFillAllItemsInBlock = function(rInp) { const b = rInp.closest('.rest-block'); if(!b) return; b.querySelectorAll('.item-name').forEach(i => autoFillRate(i)); };
 
+window.toggleEditSplitFields = function() { const mode = $('edit-payment-status').value; if (mode === 'Split') $('edit-split-inputs').classList.remove('hidden'); else $('edit-split-inputs').classList.add('hidden'); };
+window.addEditItem = function(rId) {
+  const c = document.getElementById(`edit-items-rest-${rId}`), d = document.createElement('div'); d.className = 'item-row flex gap-2 items-start';
+  d.innerHTML = `<div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" oninput="calcEditTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" value="1" min="1" oninput="calcEditTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500" onclick="removeEditItem(this)">✕</button>`;
+  c.appendChild(d);
+};
+window.addEditRestaurant = function() {
+  editRestCount++; const w = $('edit-restaurants-wrapper'), d = document.createElement('div'); d.className = 'rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f] relative mt-4'; d.dataset.restId = editRestCount;
+  d.innerHTML = `<button type="button" class="absolute top-3 right-3 text-slate-500 hover:text-red-500 text-xs font-bold uppercase tracking-wider" onclick="removeEditRest(this)">Remove</button><div class="mb-4 pr-16"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="edit-items-rest-${editRestCount}"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" oninput="calcEditTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" value="1" min="1" oninput="calcEditTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500" onclick="removeEditItem(this)">✕</button></div></div><button type="button" onclick="addEditItem(${editRestCount})" class="text-xs font-semibold hover:opacity-80" style="color: #ff5a36;">+ Add Item</button>`;
+  w.appendChild(d);
+};
+window.removeEditItem = function(btn) { btn.parentElement.remove(); if(typeof calcEditTotal === 'function') calcEditTotal(); };
+window.removeEditRest = function(btn) { btn.parentElement.remove(); if(typeof calcEditTotal === 'function') calcEditTotal(); };
 
-// --- BULLETPROOF EDIT MODAL LOGIC ---
+window.calcEditTotal = function() {
+  let tot = 0; 
+  document.querySelectorAll('#edit-restaurants-wrapper .item-row').forEach(r => { 
+      tot += ((parseFloat(r.querySelector('.item-rate').value) || 0) * (parseFloat(r.querySelector('.item-qty').value) || 0)); 
+  });
+  const delInput = $('edit-del-charge');
+  const del = delInput ? (parseFloat(delInput.value) || 0) : 0; 
+  const g = tot + del;
+  
+  if ($('edit-subtotal')) $('edit-subtotal').textContent = '₹' + tot.toLocaleString('en-IN', { minimumFractionDigits: 2 }); 
+  if ($('edit-delivery-display')) $('edit-delivery-display').textContent = '₹' + del.toLocaleString('en-IN', { minimumFractionDigits: 2 }); 
+  if ($('edit-grand-total')) $('edit-grand-total').textContent = '₹' + g.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+};
+
 window.openEditModal = function(backendId) {
     try {
       const item = allOrders.find(o => o.__backendId === backendId); 
@@ -351,6 +383,8 @@ window.openEditModal = function(backendId) {
       if ($('edit-address')) $('edit-address').value = first.address || ''; 
       if ($('edit-contact')) $('edit-contact').value = first.contact || ''; 
       if ($('edit-rider')) $('edit-rider').value = first.rider || ''; 
+      
+      // SHIFT LOAD LOGIC UPDATED
       if ($('edit-shift')) $('edit-shift').value = first.shift || 'Before Lunch';
       
       let tDel = 0; 
@@ -396,34 +430,6 @@ window.openEditModal = function(backendId) {
         console.error("Edit Modal Error:", err);
         showToast('Error: ' + err.message, 'error');
     }
-};
-
-window.toggleEditSplitFields = function() { const mode = $('edit-payment-status').value; if (mode === 'Split') $('edit-split-inputs').classList.remove('hidden'); else $('edit-split-inputs').classList.add('hidden'); };
-window.addEditItem = function(rId) {
-  const c = document.getElementById(`edit-items-rest-${rId}`), d = document.createElement('div'); d.className = 'item-row flex gap-2 items-start';
-  d.innerHTML = `<div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" oninput="if(typeof calcEditTotal === 'function') calcEditTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" value="1" min="1" oninput="if(typeof calcEditTotal === 'function') calcEditTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500" onclick="removeEditItem(this)">✕</button>`;
-  c.appendChild(d);
-};
-window.addEditRestaurant = function() {
-  editRestCount++; const w = $('edit-restaurants-wrapper'), d = document.createElement('div'); d.className = 'rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f] relative mt-4'; d.dataset.restId = editRestCount;
-  d.innerHTML = `<button type="button" class="absolute top-3 right-3 text-slate-500 hover:text-red-500 text-xs font-bold uppercase tracking-wider" onclick="removeEditRest(this)">Remove</button><div class="mb-4 pr-16"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="edit-items-rest-${editRestCount}"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" oninput="if(typeof calcEditTotal === 'function') calcEditTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" value="1" min="1" oninput="if(typeof calcEditTotal === 'function') calcEditTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500" onclick="removeEditItem(this)">✕</button></div></div><button type="button" onclick="addEditItem(${editRestCount})" class="text-xs font-semibold hover:opacity-80" style="color: #ff5a36;">+ Add Item</button>`;
-  w.appendChild(d);
-};
-window.removeEditItem = function(btn) { btn.parentElement.remove(); if(typeof calcEditTotal === 'function') calcEditTotal(); };
-window.removeEditRest = function(btn) { btn.parentElement.remove(); if(typeof calcEditTotal === 'function') calcEditTotal(); };
-
-window.calcEditTotal = function() {
-  let tot = 0; 
-  document.querySelectorAll('#edit-restaurants-wrapper .item-row').forEach(r => { 
-      tot += ((parseFloat(r.querySelector('.item-rate').value) || 0) * (parseFloat(r.querySelector('.item-qty').value) || 0)); 
-  });
-  const delInput = $('edit-del-charge');
-  const del = delInput ? (parseFloat(delInput.value) || 0) : 0; 
-  const g = tot + del;
-  
-  if ($('edit-subtotal')) $('edit-subtotal').textContent = '₹' + tot.toLocaleString('en-IN', { minimumFractionDigits: 2 }); 
-  if ($('edit-delivery-display')) $('edit-delivery-display').textContent = '₹' + del.toLocaleString('en-IN', { minimumFractionDigits: 2 }); 
-  if ($('edit-grand-total')) $('edit-grand-total').textContent = '₹' + g.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 };
 
 window.handleFullEditSubmit = async function(event) {
@@ -707,7 +713,9 @@ function createRow(order) {
   const tr = document.createElement('tr'); tr.style.cssText = 'border-top:1px solid #1e2030;';
   const isConfirming = pendingDelete === order.__backendId;
   const statusColor = (order.payment_status === 'UPI Done') ? '#3b82f6' : (order.payment_status === 'Payment Pending') ? '#f59e0b' : (order.payment_status === 'Cash') ? '#10b981' : (order.payment_status && String(order.payment_status).includes('Split')) ? '#a855f7' : '#6b7084';
-  const shiftBadge = order.shift === 'After Lunch' ? '🌙' : (order.shift === 'Before Lunch' ? '☀️' : '');
+  
+  // YAHAN NAYA BADGE (⚡) LAGAYA GAYA HAI
+  const shiftBadge = order.shift === 'After Lunch' ? '🌙' : (order.shift === 'Before Lunch' ? '☀️' : (order.shift === 'No Lunch Break' ? '⚡' : ''));
 
   let displayPaymentStatus = String(order.payment_status || '');
   if (displayPaymentStatus === "Split (Included in total)") {
