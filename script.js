@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 15.0 Loaded! 'No Lunch Break' Shift Added.");
+console.log("App Version 16.0 Loaded! Cash and UPI Rider Breakdown Added.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -70,7 +70,6 @@ window.handleDepositedCashChange = function() {
   cashSaveTimeout = setTimeout(() => { const key = currentFilterDate + "_" + (currentShiftFilter.replace(/\s+/g, '')); dbDailyCash.child(key).set(val); }, 800);
 };
 
-// --- CASH DEPOSIT FIX FOR 3 SHIFTS ---
 window.updatePendingCashUI = function(inputVal = null) {
   const inputEl = $('deposited-cash-input'), labelEl = $('deposited-label'), display = $('pending-cash-display');
   if (!currentFilterDate) {
@@ -84,9 +83,7 @@ window.updatePendingCashUI = function(inputVal = null) {
     const beforeVal = parseFloat(depositedCashData[dateStr + "_BeforeLunch"]) || 0;
     const afterVal = parseFloat(depositedCashData[dateStr + "_AfterLunch"]) || 0;
     const noLunchVal = parseFloat(depositedCashData[dateStr + "_NoLunchBreak"]) || 0;
-    
-    deposited = beforeVal + afterVal + noLunchVal; // TEENO KA TOTAL
-    
+    deposited = beforeVal + afterVal + noLunchVal; 
     if (inputEl && labelEl) { inputEl.value = deposited || ''; inputEl.disabled = true; inputEl.parentElement.style.opacity = '0.5'; inputEl.parentElement.style.pointerEvents = 'none'; labelEl.textContent = 'Auto Sum (All Shifts):'; labelEl.style.color = '#a855f7'; }
   } else {
     if (deposited === null) { deposited = depositedCashData[key] || 0; }
@@ -337,12 +334,12 @@ window.autoFillAllItemsInBlock = function(rInp) { const b = rInp.closest('.rest-
 window.toggleEditSplitFields = function() { const mode = $('edit-payment-status').value; if (mode === 'Split') $('edit-split-inputs').classList.remove('hidden'); else $('edit-split-inputs').classList.add('hidden'); };
 window.addEditItem = function(rId) {
   const c = document.getElementById(`edit-items-rest-${rId}`), d = document.createElement('div'); d.className = 'item-row flex gap-2 items-start';
-  d.innerHTML = `<div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" oninput="calcEditTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" value="1" min="1" oninput="calcEditTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500" onclick="removeEditItem(this)">✕</button>`;
+  d.innerHTML = `<div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" oninput="if(typeof calcEditTotal === 'function') calcEditTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" value="1" min="1" oninput="if(typeof calcEditTotal === 'function') calcEditTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500" onclick="removeEditItem(this)">✕</button>`;
   c.appendChild(d);
 };
 window.addEditRestaurant = function() {
   editRestCount++; const w = $('edit-restaurants-wrapper'), d = document.createElement('div'); d.className = 'rest-block p-4 rounded-lg border border-slate-700 bg-[#16181f] relative mt-4'; d.dataset.restId = editRestCount;
-  d.innerHTML = `<button type="button" class="absolute top-3 right-3 text-slate-500 hover:text-red-500 text-xs font-bold uppercase tracking-wider" onclick="removeEditRest(this)">Remove</button><div class="mb-4 pr-16"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="edit-items-rest-${editRestCount}"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" oninput="calcEditTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" value="1" min="1" oninput="calcEditTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500" onclick="removeEditItem(this)">✕</button></div></div><button type="button" onclick="addEditItem(${editRestCount})" class="text-xs font-semibold hover:opacity-80" style="color: #ff5a36;">+ Add Item</button>`;
+  d.innerHTML = `<button type="button" class="absolute top-3 right-3 text-slate-500 hover:text-red-500 text-xs font-bold uppercase tracking-wider" onclick="removeEditRest(this)">Remove</button><div class="mb-4 pr-16"><label class="block text-xs font-medium text-slate-400 mb-1">Restaurant Name *</label><input type="text" class="rest-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillAllItemsInBlock(this)"></div><div class="items-container space-y-3 mb-3" id="edit-items-rest-${editRestCount}"><div class="item-row flex gap-2 items-start"><div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" oninput="if(typeof calcEditTotal === 'function') calcEditTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" value="1" min="1" oninput="if(typeof calcEditTotal === 'function') calcEditTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500" onclick="removeEditItem(this)">✕</button></div></div><button type="button" onclick="addEditItem(${editRestCount})" class="text-xs font-semibold hover:opacity-80" style="color: #ff5a36;">+ Add Item</button>`;
   w.appendChild(d);
 };
 window.removeEditItem = function(btn) { btn.parentElement.remove(); if(typeof calcEditTotal === 'function') calcEditTotal(); };
@@ -383,8 +380,6 @@ window.openEditModal = function(backendId) {
       if ($('edit-address')) $('edit-address').value = first.address || ''; 
       if ($('edit-contact')) $('edit-contact').value = first.contact || ''; 
       if ($('edit-rider')) $('edit-rider').value = first.rider || ''; 
-      
-      // SHIFT LOAD LOGIC UPDATED
       if ($('edit-shift')) $('edit-shift').value = first.shift || 'Before Lunch';
       
       let tDel = 0; 
@@ -584,6 +579,7 @@ window.confirmDelete = async function(bId) { await dbOrders.child(bId).remove();
 window.filterData = function() { currentFilterDate = $('date-filter').value; currentShiftFilter = $('shift-filter') ? $('shift-filter').value : 'All'; currentRestFilter = $('filter-restaurant') ? $('filter-restaurant').value : 'All'; currentRiderFilter = $('filter-rider') ? $('filter-rider').value : 'All'; updateStats(); renderOrders(); }
 function countUniqueOrders(arr) { let s = new Set(); arr.forEach(o => s.add(o.order_id || o.__backendId)); return s.size; }
 
+// --- STATS ENGINE WITH RIDER CASH/UPI BREAKDOWN ---
 function updateStats() {
   const baseFilteredData = allOrders.filter(o => { 
       const isDateMatch = !currentFilterDate || (o.date && String(o.date).includes(currentFilterDate)); 
@@ -623,7 +619,7 @@ function updateStats() {
 
     let oId = o.order_id || o.__backendId;
     if (!ordersGroup[oId]) {
-        ordersGroup[oId] = { totalValue: 0, status: String(o.payment_status || "") };
+        ordersGroup[oId] = { totalValue: 0, status: String(o.payment_status || ""), rider: String(o.rider || '').trim() };
     }
     
     ordersGroup[oId].totalValue += rowTotal;
@@ -633,18 +629,72 @@ function updateStats() {
     }
   });
 
+  // DATA OBJECTS FOR BREAKDOWN
+  let riderCashData = {};
+  let riderUpiData = {};
+
   Object.values(ordersGroup).forEach(grp => {
       let stat = String(grp.status || "");
-      if (stat === 'UPI Done') { upiTotal += grp.totalValue; }
-      else if (stat === 'Cash') { cashTotal += grp.totalValue; }
-      else if (stat === 'Payment Pending') { pendingTotal += grp.totalValue; }
+      let rider = grp.rider || 'Unassigned';
+      
+      if (!riderCashData[rider]) riderCashData[rider] = 0;
+      if (!riderUpiData[rider]) riderUpiData[rider] = 0;
+
+      if (stat === 'UPI Done') { 
+          upiTotal += grp.totalValue; 
+          riderUpiData[rider] += grp.totalValue;
+      }
+      else if (stat === 'Cash') { 
+          cashTotal += grp.totalValue; 
+          riderCashData[rider] += grp.totalValue;
+      }
+      else if (stat === 'Payment Pending') { 
+          pendingTotal += grp.totalValue; 
+      }
       else if (stat.includes('Split')) {
           const cashMatch = stat.match(/Cash ₹([\d.]+)/);
           const upiMatch = stat.match(/UPI ₹([\d.]+)/);
-          cashTotal += cashMatch ? parseFloat(cashMatch[1]) : 0;
-          upiTotal += upiMatch ? parseFloat(upiMatch[1]) : 0;
+          
+          let sC = cashMatch ? parseFloat(cashMatch[1]) : 0;
+          let sU = upiMatch ? parseFloat(upiMatch[1]) : 0;
+          
+          cashTotal += sC;
+          upiTotal += sU;
+          
+          riderCashData[rider] += sC;
+          riderUpiData[rider] += sU;
       }
   });
+
+  // RENDER CASH BREAKDOWN HTML
+  if ($('cash-breakdown-content')) {
+      if (Object.keys(riderCashData).length === 0 || Object.values(riderCashData).every(v => v === 0)) {
+          $('cash-breakdown-content').innerHTML = '<div class="text-slate-500 italic mt-1">No cash collected</div>';
+      } else {
+          let html = '';
+          for (let r in riderCashData) {
+              if (riderCashData[r] > 0) {
+                  html += `<div class="flex justify-between items-center gap-6 mb-2 border-b border-slate-700/50 pb-2 last:border-0 last:pb-0"><span class="font-medium text-slate-300 capitalize">${r}</span><span class="font-bold text-white">₹${riderCashData[r].toFixed(2)}</span></div>`;
+              }
+          }
+          $('cash-breakdown-content').innerHTML = html;
+      }
+  }
+
+  // RENDER UPI BREAKDOWN HTML
+  if ($('upi-breakdown-content')) {
+      if (Object.keys(riderUpiData).length === 0 || Object.values(riderUpiData).every(v => v === 0)) {
+          $('upi-breakdown-content').innerHTML = '<div class="text-slate-500 italic mt-1">No UPI received</div>';
+      } else {
+          let html = '';
+          for (let r in riderUpiData) {
+              if (riderUpiData[r] > 0) {
+                  html += `<div class="flex justify-between items-center gap-6 mb-2 border-b border-slate-700/50 pb-2 last:border-0 last:pb-0"><span class="font-medium text-slate-300 capitalize">${r}</span><span class="font-bold text-white">₹${riderUpiData[r].toFixed(2)}</span></div>`;
+              }
+          }
+          $('upi-breakdown-content').innerHTML = html;
+      }
+  }
 
   const activeOrders = filteredData.filter(o => o.status !== 'Cancelled'), deliveredCashOrders = activeOrders.filter(o => o.payment_status === 'Cash' || String(o.payment_status || '').includes('Split')), deliveredUpiOrders = activeOrders.filter(o => o.payment_status === 'UPI Done' || String(o.payment_status || '').includes('Split')), allDeliveredOrders = activeOrders.filter(o => o.status === 'Delivered'), pendingOrders = activeOrders.filter(o => o.payment_status === 'Payment Pending');
 
@@ -714,7 +764,6 @@ function createRow(order) {
   const isConfirming = pendingDelete === order.__backendId;
   const statusColor = (order.payment_status === 'UPI Done') ? '#3b82f6' : (order.payment_status === 'Payment Pending') ? '#f59e0b' : (order.payment_status === 'Cash') ? '#10b981' : (order.payment_status && String(order.payment_status).includes('Split')) ? '#a855f7' : '#6b7084';
   
-  // YAHAN NAYA BADGE (⚡) LAGAYA GAYA HAI
   const shiftBadge = order.shift === 'After Lunch' ? '🌙' : (order.shift === 'Before Lunch' ? '☀️' : (order.shift === 'No Lunch Break' ? '⚡' : ''));
 
   let displayPaymentStatus = String(order.payment_status || '');

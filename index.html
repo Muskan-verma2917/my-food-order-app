@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=150">
+  <link rel="stylesheet" href="style.css?v=160">
   <link rel="manifest" href="manifest.json">
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -25,7 +25,7 @@
     <div class="flex items-center gap-3 w-full lg:w-auto justify-center lg:justify-start">
      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:#e85d3a;"><i data-lucide="utensils" style="width:18px;height:18px;color:#fff;"></i></div>
      <h1 id="app-title" class="text-lg sm:text-xl font-bold flex items-center gap-2" style="font-family:'Playfair Display',serif;">
-       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v15.0</span>
+       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v16.0</span>
      </h1>
     </div>
     
@@ -79,13 +79,23 @@
       <div id="stat-delivered-total" class="text-lg font-semibold" style="color: #22c55e;">₹0.00</div>
       <p class="text-[10px] mt-1 text-slate-500">All Completed Orders</p>
      </div>
+     
      <div class="stat-card rounded-xl p-4 sm:p-5 flex flex-col justify-between" style="background-color: #1e212b; border: 1px solid #2d3139;">
-      <div>
+      <div class="relative group cursor-help">
        <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-2 flex items-center gap-2"><i data-lucide="banknote" style="width:14px;height:14px;"></i> Delivered (Cash)</div>
        <div class="flex items-end justify-between mb-1">
         <div id="stat-delivered-cash" class="text-3xl font-bold" style="color: #10b981;">0</div>
         <div class="text-right">
          <div id="stat-delivered-cash-total" class="text-lg font-semibold" style="color: #10b981;">₹0.00</div>
+        </div>
+       </div>
+       <p class="text-[10px] mt-1 text-slate-500">Hover for Breakdown ↓</p>
+       
+       <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-[100]">
+        <div class="bg-[#16181f] border border-emerald-500/50 rounded-lg p-3 whitespace-nowrap text-xs relative" style="box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);">
+         <div class="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1.5 w-3 h-3 bg-[#16181f] border-r border-b border-emerald-500/50 rotate-45 z-10"></div>
+         <div style="color:#10b981; font-weight:bold; margin-bottom:6px; border-bottom:1px solid #2d3139; padding-bottom:4px; position:relative; z-index:20;">Cash by Riders</div>
+         <div id="cash-breakdown-content" style="color:#cbd5e1; min-width: 150px; position:relative; z-index:20;"></div>
         </div>
        </div>
       </div>
@@ -100,18 +110,29 @@
        <div id="pending-cash-display" class="text-right text-[11px] font-bold mt-1.5" style="min-height: 16px;"></div>
       </div>
      </div>
-     <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
+
+     <div class="stat-card rounded-xl p-5 relative group cursor-help" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-2"><i data-lucide="credit-card" style="width:14px;height:14px;"></i> Delivered (UPI)</div>
       <div id="stat-delivered-upi" class="text-3xl font-bold mb-2" style="color: #3b82f6;">0</div>
       <div id="stat-delivered-upi-total" class="text-lg font-semibold" style="color: #3b82f6;">₹0.00</div>
-      <p class="text-[10px] mt-1 text-slate-500">Bank Received</p>
+      <p class="text-[10px] mt-1 text-slate-500">Hover for Breakdown ↓</p>
+      
+      <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-[100]">
+       <div class="bg-[#16181f] border border-blue-500/50 rounded-lg p-3 whitespace-nowrap text-xs relative" style="box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);">
+        <div class="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1.5 w-3 h-3 bg-[#16181f] border-r border-b border-blue-500/50 rotate-45 z-10"></div>
+        <div style="color:#3b82f6; font-weight:bold; margin-bottom:6px; border-bottom:1px solid #2d3139; padding-bottom:4px; position:relative; z-index:20;">UPI by Riders</div>
+        <div id="upi-breakdown-content" style="color:#cbd5e1; min-width: 150px; position:relative; z-index:20;"></div>
+       </div>
+      </div>
      </div>
+     
      <div class="stat-card rounded-xl p-5" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-2"><i data-lucide="clock" style="width:14px;height:14px;"></i> Payment Pending</div>
       <div id="stat-payment-pending" class="text-3xl font-bold mb-2" style="color: #f59e0b;">0</div>
       <div id="stat-payment-pending-total" class="text-lg font-semibold" style="color: #f59e0b;">₹0.00</div>
       <p class="text-[10px] mt-1 text-slate-500">Total Pending</p>
      </div>
+     
      <div class="stat-card rounded-xl p-5 relative group" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center justify-between gap-2">
        <div class="flex items-center gap-2"><i data-lucide="bike" style="width:14px;height:14px;"></i> Active Riders</div>
@@ -128,6 +149,7 @@
        </div>
       </div>
      </div>
+     
      <div class="stat-card rounded-xl p-5 relative group cursor-help" style="background-color: #1e212b; border: 1px solid #2d3139;">
       <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-2"><i data-lucide="store" style="width:14px;height:14px;"></i> Restaurants</div>
       <div id="stat-rest-count" class="text-3xl font-bold mb-2" style="color: #f43f5e;">0</div>
@@ -312,7 +334,7 @@
       <div><label class="block text-xs font-medium text-slate-400 mb-1">Shift *</label> 
         <select id="edit-shift" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" style="background-color: #1e212b;"> 
           <option value="Before Lunch">☀️ Before Lunch</option> 
-          <option value="After Lunch">🌙 After Lunch</option>
+          <option value="After Lunch">🌙 After Lunch</option> 
           <option value="No Lunch Break">⚡ No Lunch Break</option> 
         </select>
       </div>
@@ -367,6 +389,6 @@
    </div>
   </div>
 
-  <script src="script.js?v=150"></script>
+  <script src="script.js?v=160"></script>
  </body>
 </html>
