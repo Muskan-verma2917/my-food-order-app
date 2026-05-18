@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 16.0 Loaded! Cash and UPI Rider Breakdown Added.");
+console.log("App Version 18.0 Loaded! Manual Order Time Input Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -382,6 +382,9 @@ window.openEditModal = function(backendId) {
       if ($('edit-rider')) $('edit-rider').value = first.rider || ''; 
       if ($('edit-shift')) $('edit-shift').value = first.shift || 'Before Lunch';
       
+      // LOAD MANUAL ORDER TIME
+      if ($('edit-time')) $('edit-time').value = first.order_time || '';
+      
       let tDel = 0; 
       originalOrderItems.forEach(o => tDel += (parseFloat(o.delivery_charge) || 0)); 
       if ($('edit-del-charge')) $('edit-del-charge').value = tDel;
@@ -439,6 +442,10 @@ window.handleFullEditSubmit = async function(event) {
     });
     if(finalItems.length === 0) throw new Error("At least one item is required!");
     const pMode = $('edit-payment-status').value, addr = $('edit-address').value.trim(), cont = $('edit-contact').value.trim(), rider = $('edit-rider').value.trim(), shift = $('edit-shift').value, dChg = parseFloat($('edit-del-charge').value) || 0;
+    
+    // SAVE MANUAL TIME
+    const oTime = $('edit-time') ? $('edit-time').value : '';
+
     if(!pMode) throw new Error("Select Payment Mode!"); if(!addr) throw new Error("Delivery Address required!");
     let fPMode = pMode;
     if(pMode === 'Split') { 
@@ -455,7 +462,7 @@ window.handleFullEditSubmit = async function(event) {
       if (fPMode.includes('Split') && !isFirst) {
           itemPaymentStatus = "Split (Included in total)";
       }
-      let iData = { order_id: currentlyEditingOrderId, customer_name: i.restaurant, item_name: i.name, quantity: i.qty, unit_price: i.rate, total: i.total, status: stat, date: oDate, shift: shift, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? dChg : 0 };
+      let iData = { order_id: currentlyEditingOrderId, customer_name: i.restaurant, item_name: i.name, quantity: i.qty, unit_price: i.rate, total: i.total, status: stat, date: oDate, shift: shift, order_time: oTime, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? dChg : 0 };
       if(i.__backendId) { await dbOrders.child(i.__backendId).update(iData); } else { await dbOrders.push().set(iData); }
       isFirst = false;
     }
@@ -466,6 +473,10 @@ window.handleFullEditSubmit = async function(event) {
 window.openNewOrderModal = function() {
     const form = $('new-premium-order-form');
     if (form) form.reset(); 
+    
+    // RESET MANUAL TIME FIELD
+    if ($('p-time')) $('p-time').value = '';
+
     const wrapper = $('restaurants-wrapper');
     if (wrapper) {
         wrapper.innerHTML = `
@@ -537,6 +548,10 @@ window.handlePremiumFormSubmit = async function(event) {
     if (allItems.length === 0) throw new Error("Add at least one item!");
     
     const pMode = $('p-payment').value, cont = $('p-contact').value.trim(), addr = $('p-address').value.trim(), rider = $('p-rider').value.trim(), shift = $('p-shift').value, delChg = parseFloat($('p-del-charge').value) || 0;
+    
+    // FETCH MANUAL TIME
+    const oTime = $('p-time') ? $('p-time').value : '';
+
     if (!pMode) throw new Error("Select Payment Mode!"); if (!addr) throw new Error("Address is required!");
     let fPMode = pMode;
     if (pMode === 'Split') { let sC = (parseFloat($('split-cash').value) || 0) + delChg, sU = parseFloat($('split-upi').value) || 0; fPMode = `Split: Cash ₹${sC.toFixed(2)} | UPI ₹${sU.toFixed(2)}`; }
@@ -551,7 +566,7 @@ window.handlePremiumFormSubmit = async function(event) {
           itemPaymentStatus = "Split (Included in total)";
       }
 
-      await dbOrders.push().set({ order_id: cOrderId, customer_name: item.restaurant, item_name: item.name, quantity: item.qty, unit_price: item.rate, total: item.total, status: stat, date: oDate, shift: shift, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? delChg : 0 });
+      await dbOrders.push().set({ order_id: cOrderId, customer_name: item.restaurant, item_name: item.name, quantity: item.qty, unit_price: item.rate, total: item.total, status: stat, date: oDate, shift: shift, order_time: oTime, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? delChg : 0 });
       isFirst = false;
     }
     
@@ -579,7 +594,6 @@ window.confirmDelete = async function(bId) { await dbOrders.child(bId).remove();
 window.filterData = function() { currentFilterDate = $('date-filter').value; currentShiftFilter = $('shift-filter') ? $('shift-filter').value : 'All'; currentRestFilter = $('filter-restaurant') ? $('filter-restaurant').value : 'All'; currentRiderFilter = $('filter-rider') ? $('filter-rider').value : 'All'; updateStats(); renderOrders(); }
 function countUniqueOrders(arr) { let s = new Set(); arr.forEach(o => s.add(o.order_id || o.__backendId)); return s.size; }
 
-// --- STATS ENGINE WITH RIDER CASH/UPI BREAKDOWN ---
 function updateStats() {
   const baseFilteredData = allOrders.filter(o => { 
       const isDateMatch = !currentFilterDate || (o.date && String(o.date).includes(currentFilterDate)); 
@@ -629,9 +643,9 @@ function updateStats() {
     }
   });
 
-  // DATA OBJECTS FOR BREAKDOWN
   let riderCashData = {};
   let riderUpiData = {};
+  let riderTotalDeliveredData = {};
 
   Object.values(ordersGroup).forEach(grp => {
       let stat = String(grp.status || "");
@@ -639,14 +653,17 @@ function updateStats() {
       
       if (!riderCashData[rider]) riderCashData[rider] = 0;
       if (!riderUpiData[rider]) riderUpiData[rider] = 0;
+      if (!riderTotalDeliveredData[rider]) riderTotalDeliveredData[rider] = 0;
 
       if (stat === 'UPI Done') { 
           upiTotal += grp.totalValue; 
           riderUpiData[rider] += grp.totalValue;
+          riderTotalDeliveredData[rider] += grp.totalValue;
       }
       else if (stat === 'Cash') { 
           cashTotal += grp.totalValue; 
           riderCashData[rider] += grp.totalValue;
+          riderTotalDeliveredData[rider] += grp.totalValue;
       }
       else if (stat === 'Payment Pending') { 
           pendingTotal += grp.totalValue; 
@@ -663,10 +680,24 @@ function updateStats() {
           
           riderCashData[rider] += sC;
           riderUpiData[rider] += sU;
+          riderTotalDeliveredData[rider] += (sC + sU);
       }
   });
 
-  // RENDER CASH BREAKDOWN HTML
+  if ($('total-breakdown-content')) {
+      if (Object.keys(riderTotalDeliveredData).length === 0 || Object.values(riderTotalDeliveredData).every(v => v === 0)) {
+          $('total-breakdown-content').innerHTML = '<div class="text-slate-500 italic mt-1">No deliveries yet</div>';
+      } else {
+          let html = '';
+          for (let r in riderTotalDeliveredData) {
+              if (riderTotalDeliveredData[r] > 0) {
+                  html += `<div class="flex justify-between items-center gap-6 mb-2 border-b border-slate-700/50 pb-2 last:border-0 last:pb-0"><span class="font-medium text-slate-300 capitalize">${r}</span><span class="font-bold text-white">₹${riderTotalDeliveredData[r].toFixed(2)}</span></div>`;
+              }
+          }
+          $('total-breakdown-content').innerHTML = html;
+      }
+  }
+
   if ($('cash-breakdown-content')) {
       if (Object.keys(riderCashData).length === 0 || Object.values(riderCashData).every(v => v === 0)) {
           $('cash-breakdown-content').innerHTML = '<div class="text-slate-500 italic mt-1">No cash collected</div>';
@@ -681,7 +712,6 @@ function updateStats() {
       }
   }
 
-  // RENDER UPI BREAKDOWN HTML
   if ($('upi-breakdown-content')) {
       if (Object.keys(riderUpiData).length === 0 || Object.values(riderUpiData).every(v => v === 0)) {
           $('upi-breakdown-content').innerHTML = '<div class="text-slate-500 italic mt-1">No UPI received</div>';
@@ -771,8 +801,20 @@ function createRow(order) {
       displayPaymentStatus = "Delivered (Split)";
   }
 
+  // TIME FORMATTING
+  let timeHtml = '';
+  if (order.order_time) {
+      let [h, m] = order.order_time.split(':');
+      let ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      timeHtml = `<div class="text-[10px] opacity-60 mt-1 tracking-wider">🕒 ${h}:${m} ${ampm}</div>`;
+  }
+
   tr.innerHTML = `
-    <td class="px-4 py-3 font-medium" style="color:#60a5fa;">#${esc(order.order_id)}</td>
+    <td class="px-4 py-3 font-medium" style="color:#60a5fa;">
+      #${esc(order.order_id)}
+      ${timeHtml}
+    </td>
     <td class="px-4 py-3 font-bold text-white">${esc(order.customer_name)} <span class="text-[10px] opacity-70 ml-1">${shiftBadge}</span></td>
     <td class="px-4 py-3 text-xs"><div style="color:#f0ece4;">${esc(order.address)}</div><div style="color:#9ca3af;">${esc(order.contact)}</div></td>
     <td class="px-4 py-3 text-xs"><div style="color:#f0ece4;">${esc(order.item_name)}</div><div style="color:#9ca3af;">₹${esc(order.unit_price)} × ${esc(order.quantity)}</div></td>
