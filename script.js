@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 18.0 Loaded! Manual Order Time Input Active.");
+console.log("App Version 19.0 Loaded! Zero Rate Highlight Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -382,7 +382,6 @@ window.openEditModal = function(backendId) {
       if ($('edit-rider')) $('edit-rider').value = first.rider || ''; 
       if ($('edit-shift')) $('edit-shift').value = first.shift || 'Before Lunch';
       
-      // LOAD MANUAL ORDER TIME
       if ($('edit-time')) $('edit-time').value = first.order_time || '';
       
       let tDel = 0; 
@@ -438,12 +437,13 @@ window.handleFullEditSubmit = async function(event) {
     let finalItems = [];
     document.querySelectorAll('#edit-restaurants-wrapper .rest-block').forEach(b => {
       const rName = b.querySelector('.rest-name').value.trim();
-      if(rName) { b.querySelectorAll('.item-row').forEach(row => { const bId = row.dataset.backendId || null, name = row.querySelector('.item-name').value.trim(), rate = parseFloat(row.querySelector('.item-rate').value) || 0, qty = parseFloat(row.querySelector('.item-qty').value) || 1; if(name && rate >= 0) finalItems.push({ __backendId: bId, name, rate, qty, total: rate*qty, restaurant: rName }); }); }
+      if(rName) { b.querySelectorAll('.item-row').forEach(row => { const bId = row.dataset.backendId || null, name = row.querySelector('.item-name').value.trim(), rate = parseFloat(row.querySelector('.item-rate').value) || 0, qty = parseFloat(row.querySelector('.item-qty').value) || 1; 
+      // Changed to >= 0 so 0 rate items can be saved
+      if(name && rate >= 0) finalItems.push({ __backendId: bId, name, rate, qty, total: rate*qty, restaurant: rName }); }); }
     });
     if(finalItems.length === 0) throw new Error("At least one item is required!");
     const pMode = $('edit-payment-status').value, addr = $('edit-address').value.trim(), cont = $('edit-contact').value.trim(), rider = $('edit-rider').value.trim(), shift = $('edit-shift').value, dChg = parseFloat($('edit-del-charge').value) || 0;
     
-    // SAVE MANUAL TIME
     const oTime = $('edit-time') ? $('edit-time').value : '';
 
     if(!pMode) throw new Error("Select Payment Mode!"); if(!addr) throw new Error("Delivery Address required!");
@@ -474,7 +474,6 @@ window.openNewOrderModal = function() {
     const form = $('new-premium-order-form');
     if (form) form.reset(); 
     
-    // RESET MANUAL TIME FIELD
     if ($('p-time')) $('p-time').value = '';
 
     const wrapper = $('restaurants-wrapper');
@@ -543,13 +542,14 @@ window.handlePremiumFormSubmit = async function(event) {
     const restBlocks = document.querySelectorAll('#restaurants-wrapper .rest-block'); let allItems = [];
     restBlocks.forEach(block => {
       const restName = block.querySelector('.rest-name').value.trim();
-      if (restName) { block.querySelectorAll('.item-row').forEach(row => { const name = row.querySelector('.item-name').value.trim(), rate = parseFloat(row.querySelector('.item-rate').value) || 0, qty = parseFloat(row.querySelector('.item-qty').value) || 1; if (name && rate > 0) allItems.push({ name, rate, qty, total: rate * qty, restaurant: restName }); }); }
+      if (restName) { block.querySelectorAll('.item-row').forEach(row => { const name = row.querySelector('.item-name').value.trim(), rate = parseFloat(row.querySelector('.item-rate').value) || 0, qty = parseFloat(row.querySelector('.item-qty').value) || 1; 
+      // Changed to >= 0 so 0 rate items can be saved
+      if (name && rate >= 0) allItems.push({ name, rate, qty, total: rate * qty, restaurant: restName }); }); }
     });
     if (allItems.length === 0) throw new Error("Add at least one item!");
     
     const pMode = $('p-payment').value, cont = $('p-contact').value.trim(), addr = $('p-address').value.trim(), rider = $('p-rider').value.trim(), shift = $('p-shift').value, delChg = parseFloat($('p-del-charge').value) || 0;
     
-    // FETCH MANUAL TIME
     const oTime = $('p-time') ? $('p-time').value : '';
 
     if (!pMode) throw new Error("Select Payment Mode!"); if (!addr) throw new Error("Address is required!");
@@ -790,7 +790,18 @@ function renderOrders() {
 }
 
 function createRow(order) {
-  const tr = document.createElement('tr'); tr.style.cssText = 'border-top:1px solid #1e2030;';
+  const tr = document.createElement('tr'); 
+  
+  // ZERO RATE HIGHLIGHT LOGIC (Jadoo yahan hai)
+  let isZeroRate = parseFloat(order.unit_price) === 0;
+  let rowStyle = 'border-top:1px solid #1e2030;';
+  
+  if (isZeroRate) {
+      rowStyle += ' background-color: rgba(239, 68, 68, 0.15); border-left: 4px solid #ef4444;';
+  }
+  
+  tr.style.cssText = rowStyle;
+  
   const isConfirming = pendingDelete === order.__backendId;
   const statusColor = (order.payment_status === 'UPI Done') ? '#3b82f6' : (order.payment_status === 'Payment Pending') ? '#f59e0b' : (order.payment_status === 'Cash') ? '#10b981' : (order.payment_status && String(order.payment_status).includes('Split')) ? '#a855f7' : '#6b7084';
   
@@ -801,7 +812,6 @@ function createRow(order) {
       displayPaymentStatus = "Delivered (Split)";
   }
 
-  // TIME FORMATTING
   let timeHtml = '';
   if (order.order_time) {
       let [h, m] = order.order_time.split(':');
@@ -809,6 +819,11 @@ function createRow(order) {
       h = h % 12 || 12;
       timeHtml = `<div class="text-[10px] opacity-60 mt-1 tracking-wider">🕒 ${h}:${m} ${ampm}</div>`;
   }
+  
+  // Naya Rate Html
+  let rateHtml = isZeroRate 
+      ? `<span class="text-red-400 font-bold">₹0 ⚠️ (RATE MISSING)</span>` 
+      : `₹${esc(order.unit_price)}`;
 
   tr.innerHTML = `
     <td class="px-4 py-3 font-medium" style="color:#60a5fa;">
@@ -817,9 +832,9 @@ function createRow(order) {
     </td>
     <td class="px-4 py-3 font-bold text-white">${esc(order.customer_name)} <span class="text-[10px] opacity-70 ml-1">${shiftBadge}</span></td>
     <td class="px-4 py-3 text-xs"><div style="color:#f0ece4;">${esc(order.address)}</div><div style="color:#9ca3af;">${esc(order.contact)}</div></td>
-    <td class="px-4 py-3 text-xs"><div style="color:#f0ece4;">${esc(order.item_name)}</div><div style="color:#9ca3af;">₹${esc(order.unit_price)} × ${esc(order.quantity)}</div></td>
+    <td class="px-4 py-3 text-xs"><div style="color:#f0ece4;">${esc(order.item_name)}</div><div style="color:#9ca3af;">${rateHtml} × ${esc(order.quantity)}</div></td>
     <td class="px-4 py-3 text-xs" style="color:#9ca3af;">${esc(order.rider)}</td>
-    <td class="px-4 py-3 text-right font-bold" style="color:#10b981;">₹${(parseFloat(order.total) + parseFloat(order.delivery_charge || 0)).toFixed(2)}</td>
+    <td class="px-4 py-3 text-right font-bold" style="color:${isZeroRate ? '#ef4444' : '#10b981'};">₹${(parseFloat(order.total) + parseFloat(order.delivery_charge || 0)).toFixed(2)}</td>
     <td class="px-4 py-3 text-center">
       <select onchange="changeStatus('${order.__backendId}', this.value)" class="bg-transparent border rounded px-2 py-1 outline-none text-xs font-semibold cursor-pointer" style="border-color:${statusColor}; color:${statusColor};">
         <option value="Payment Pending" ${displayPaymentStatus === 'Payment Pending' ? 'selected' : ''} style="color:#f59e0b; background:#181a24;">Payment Pending</option>
