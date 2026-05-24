@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 19.0 Loaded! Zero Rate Highlight Active.");
+console.log("App Version 21.0 Loaded! Smart ID Sorting Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -76,25 +76,57 @@ window.updatePendingCashUI = function(inputVal = null) {
       if (inputEl && labelEl) { inputEl.value = ''; inputEl.disabled = true; inputEl.parentElement.style.opacity = '0.5'; labelEl.textContent = 'Select Date for Cash:'; labelEl.style.color = '#94a3b8'; }
       if (display) display.textContent = ''; return;
   }
-  const dateStr = currentFilterDate, shiftStr = currentShiftFilter.replace(/\s+/g, ''), key = dateStr + "_" + shiftStr;
+  
+  const dateStr = currentFilterDate;
+  const shiftStr = currentShiftFilter.replace(/\s+/g, '');
+  const key = dateStr + "_" + shiftStr;
   let deposited = inputVal;
   
   if (currentShiftFilter === 'All') {
-    const beforeVal = parseFloat(depositedCashData[dateStr + "_BeforeLunch"]) || 0;
-    const afterVal = parseFloat(depositedCashData[dateStr + "_AfterLunch"]) || 0;
-    const noLunchVal = parseFloat(depositedCashData[dateStr + "_NoLunchBreak"]) || 0;
-    deposited = beforeVal + afterVal + noLunchVal; 
-    if (inputEl && labelEl) { inputEl.value = deposited || ''; inputEl.disabled = true; inputEl.parentElement.style.opacity = '0.5'; inputEl.parentElement.style.pointerEvents = 'none'; labelEl.textContent = 'Auto Sum (All Shifts):'; labelEl.style.color = '#a855f7'; }
+    deposited = 0;
+    Object.keys(depositedCashData).forEach(k => {
+        if (k.startsWith(dateStr + "_")) {
+            deposited += parseFloat(depositedCashData[k]) || 0;
+        }
+    });
+
+    if (inputEl && labelEl) { 
+        inputEl.value = deposited || ''; 
+        inputEl.disabled = true; 
+        inputEl.parentElement.style.opacity = '0.5'; 
+        inputEl.parentElement.style.pointerEvents = 'none'; 
+        labelEl.textContent = 'Auto Sum (All Shifts):'; 
+        labelEl.style.color = '#a855f7'; 
+    }
   } else {
     if (deposited === null) { deposited = depositedCashData[key] || 0; }
-    if (inputEl && labelEl) { inputEl.value = deposited || ''; inputEl.disabled = false; inputEl.parentElement.style.opacity = '1'; inputEl.parentElement.style.pointerEvents = 'auto'; labelEl.textContent = 'Rider Deposited:'; labelEl.style.color = '#94a3b8'; }
+    if (inputEl && labelEl) { 
+        inputEl.value = deposited || ''; 
+        inputEl.disabled = false; 
+        inputEl.parentElement.style.opacity = '1'; 
+        inputEl.parentElement.style.pointerEvents = 'auto'; 
+        labelEl.textContent = 'Rider Deposited:'; 
+        labelEl.style.color = '#94a3b8'; 
+    }
   }
-  let numDeposited = parseFloat(deposited) || 0, pending = currentTotalCash - numDeposited;
+  
+  let numDeposited = parseFloat(deposited) || 0;
+  let pending = currentTotalCash - numDeposited;
+  
   if (!display) return;
-  if (pending > 0) { display.textContent = `⚠️ Pending: ₹${pending.toFixed(2)}`; display.style.color = '#ef4444'; } 
-  else if (pending < 0) { display.textContent = `⚠️ Extra: ₹${Math.abs(pending).toFixed(2)}`; display.style.color = '#f59e0b'; } 
-  else if (currentTotalCash > 0 && pending === 0) { display.textContent = `✅ Clear: ₹0.00`; display.style.color = '#10b981'; } 
-  else { display.textContent = ''; }
+  
+  if (pending > 0) { 
+      display.textContent = `⚠️ Pending: ₹${pending.toFixed(2)}`; 
+      display.style.color = '#ef4444'; 
+  } else if (pending < 0) { 
+      display.textContent = `⚠️ Extra: ₹${Math.abs(pending).toFixed(2)}`; 
+      display.style.color = '#f59e0b'; 
+  } else if (currentTotalCash > 0 && pending === 0) { 
+      display.textContent = `✅ Clear: ₹0.00`; 
+      display.style.color = '#10b981'; 
+  } else { 
+      display.textContent = ''; 
+  }
 };
 
 window.toggleModal = function(show) { 
@@ -438,7 +470,6 @@ window.handleFullEditSubmit = async function(event) {
     document.querySelectorAll('#edit-restaurants-wrapper .rest-block').forEach(b => {
       const rName = b.querySelector('.rest-name').value.trim();
       if(rName) { b.querySelectorAll('.item-row').forEach(row => { const bId = row.dataset.backendId || null, name = row.querySelector('.item-name').value.trim(), rate = parseFloat(row.querySelector('.item-rate').value) || 0, qty = parseFloat(row.querySelector('.item-qty').value) || 1; 
-      // Changed to >= 0 so 0 rate items can be saved
       if(name && rate >= 0) finalItems.push({ __backendId: bId, name, rate, qty, total: rate*qty, restaurant: rName }); }); }
     });
     if(finalItems.length === 0) throw new Error("At least one item is required!");
@@ -543,7 +574,6 @@ window.handlePremiumFormSubmit = async function(event) {
     restBlocks.forEach(block => {
       const restName = block.querySelector('.rest-name').value.trim();
       if (restName) { block.querySelectorAll('.item-row').forEach(row => { const name = row.querySelector('.item-name').value.trim(), rate = parseFloat(row.querySelector('.item-rate').value) || 0, qty = parseFloat(row.querySelector('.item-qty').value) || 1; 
-      // Changed to >= 0 so 0 rate items can be saved
       if (name && rate >= 0) allItems.push({ name, rate, qty, total: rate * qty, restaurant: restName }); }); }
     });
     if (allItems.length === 0) throw new Error("Add at least one item!");
@@ -782,9 +812,18 @@ function renderOrders() {
     return false;
   });
 
+  // 🚨 NAYA SMART SORTING LOGIC 🚨
+  filtered.sort((a, b) => {
+      const idA = parseInt(a.order_id) || 0;
+      const idB = parseInt(b.order_id) || 0;
+      return idA - idB; 
+  });
+
   if (filtered.length === 0) { if(tbody) tbody.innerHTML = ''; if($('empty-state')) $('empty-state').classList.remove('hidden'); return; }
   if($('empty-state')) $('empty-state').classList.add('hidden');
   const fragment = document.createDocumentFragment();
+  
+  // Highest ID sabse upar dikhegi
   for (let i = filtered.length - 1; i >= 0; i--) { fragment.appendChild(createRow(filtered[i])); }
   if(tbody) { tbody.innerHTML = ''; tbody.appendChild(fragment); }
 }
@@ -792,7 +831,6 @@ function renderOrders() {
 function createRow(order) {
   const tr = document.createElement('tr'); 
   
-  // ZERO RATE HIGHLIGHT LOGIC (Jadoo yahan hai)
   let isZeroRate = parseFloat(order.unit_price) === 0;
   let rowStyle = 'border-top:1px solid #1e2030;';
   
@@ -820,7 +858,6 @@ function createRow(order) {
       timeHtml = `<div class="text-[10px] opacity-60 mt-1 tracking-wider">🕒 ${h}:${m} ${ampm}</div>`;
   }
   
-  // Naya Rate Html
   let rateHtml = isZeroRate 
       ? `<span class="text-red-400 font-bold">₹0 ⚠️ (RATE MISSING)</span>` 
       : `₹${esc(order.unit_price)}`;
