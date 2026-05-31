@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 21.0 Loaded! Smart ID Sorting Active.");
+console.log("App Version 23.0 Loaded! Default Delivery 10 + Smart Shift Sync Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -506,6 +506,21 @@ window.openNewOrderModal = function() {
     if (form) form.reset(); 
     
     if ($('p-time')) $('p-time').value = '';
+    
+    // --- 🚨 JADOO 1: 10 RS DELIVERY CHARGE DEFAULT 🚨 ---
+    if ($('p-del-charge')) {
+        $('p-del-charge').value = '10';
+    }
+
+    // --- 🚨 JADOO 2: SMART SHIFT SYNC 🚨 ---
+    const mainShift = $('shift-filter') ? $('shift-filter').value : 'All';
+    if ($('p-shift')) {
+        if (mainShift !== 'All') {
+            $('p-shift').value = mainShift; 
+        } else {
+            $('p-shift').value = 'Before Lunch'; 
+        }
+    }
 
     const wrapper = $('restaurants-wrapper');
     if (wrapper) {
@@ -536,9 +551,17 @@ window.openNewOrderModal = function() {
         </div>`;
     }
     premRestCount = 1;
-    if($('p-grand-total')) $('p-grand-total').textContent = '₹0';
-    if($('p-subtotal')) $('p-subtotal').textContent = '₹0';
-    if($('p-delivery-display')) $('p-delivery-display').textContent = '₹0';
+    
+    // --- 🚨 JADOO 3: TURANT TOTAL CALCULATION 🚨 ---
+    // Taaki khulte hi form mein Delivery aur Order Total 10 Rs dikh jaye
+    if (typeof calcPremiumTotal === 'function') {
+        calcPremiumTotal();
+    } else {
+        if($('p-grand-total')) $('p-grand-total').textContent = '₹0';
+        if($('p-subtotal')) $('p-subtotal').textContent = '₹0';
+        if($('p-delivery-display')) $('p-delivery-display').textContent = '₹0';
+    }
+
     if($('split-inputs')) $('split-inputs').classList.add('hidden');
     toggleModal(true);
 };
@@ -762,7 +785,7 @@ function updateStats() {
   if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = countUniqueOrders(deliveredCashOrders); if ($('stat-delivered-cash-total')) $('stat-delivered-cash-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   currentTotalCash = cashTotal; updatePendingCashUI();
   if ($('stat-delivered-upi')) $('stat-delivered-upi').textContent = countUniqueOrders(deliveredUpiOrders); if ($('stat-delivered-upi-total')) $('stat-delivered-upi-total').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('stat-delivered')) $('stat-delivered').textContent = countUniqueOrders(allDeliveredOrders); if ($('stat-delivered-total')) $('stat-delivered-total').textContent = '₹' + (cashTotal + upiTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  if ($('stat-delivered')) $('stat-delivered-total').textContent = '₹' + (cashTotal + upiTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 });
   if ($('stat-payment-pending')) $('stat-payment-pending').textContent = countUniqueOrders(pendingOrders); if ($('stat-payment-pending-total')) $('stat-payment-pending-total').textContent = '₹' + pendingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   if ($('stat-total-orders')) $('stat-total-orders').textContent = countUniqueOrders(activeOrders);
 
@@ -812,7 +835,6 @@ function renderOrders() {
     return false;
   });
 
-  // 🚨 NAYA SMART SORTING LOGIC 🚨
   filtered.sort((a, b) => {
       const idA = parseInt(a.order_id) || 0;
       const idB = parseInt(b.order_id) || 0;
@@ -823,7 +845,6 @@ function renderOrders() {
   if($('empty-state')) $('empty-state').classList.add('hidden');
   const fragment = document.createDocumentFragment();
   
-  // Highest ID sabse upar dikhegi
   for (let i = filtered.length - 1; i >= 0; i--) { fragment.appendChild(createRow(filtered[i])); }
   if(tbody) { tbody.innerHTML = ''; tbody.appendChild(fragment); }
 }
