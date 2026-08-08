@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 25.0 Loaded! Multi-Color Order Grouping Active.");
+console.log("App Version 26.0 Loaded! Date Column & Smart Grouping Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -838,14 +838,13 @@ function renderOrders() {
   if($('empty-state')) $('empty-state').classList.add('hidden');
   const fragment = document.createDocumentFragment();
   
-  // --- 🚨 JADOO: MULTI-COLOR LOGIC 🚨 ---
   const colorPalette = [
-      'rgba(99, 102, 241, 0.1)',   // Indigo (Blue tint)
-      'rgba(16, 185, 129, 0.1)',   // Emerald (Green tint)
-      'rgba(245, 158, 11, 0.1)',   // Amber (Yellow/Orange tint)
-      'rgba(244, 63, 94, 0.1)',    // Rose (Pink/Red tint)
-      'rgba(6, 182, 212, 0.1)',    // Cyan (Light blue tint)
-      'rgba(168, 85, 247, 0.1)'    // Purple tint
+      'rgba(99, 102, 241, 0.1)',   
+      'rgba(16, 185, 129, 0.1)',   
+      'rgba(245, 158, 11, 0.1)',   
+      'rgba(244, 63, 94, 0.1)',    
+      'rgba(6, 182, 212, 0.1)',    
+      'rgba(168, 85, 247, 0.1)'    
   ];
   let colorIndex = 0;
   const assignedColors = {};
@@ -874,6 +873,7 @@ function renderOrders() {
           rowColor = assignedColors[currentId];
       }
       
+      // --- 🚨 JADOO: DATE HIDDEN IN SUBSEQUENT ROWS 🚨 ---
       fragment.appendChild(createRow(currentOrder, rowColor, hideTopBorder));
       prevVisualOrderId = currentId;
   }
@@ -893,7 +893,6 @@ function createRow(order, rowColor = null, hideTopBorder = false) {
       rowStyle += 'border-top: 1px solid #1e2030; '; 
   }
 
-  // ALAG-ALAG RANG (MULTI-COLOR) HIGHLIGHT
   if (isZeroRate) {
       rowStyle += 'background-color: rgba(239, 68, 68, 0.15); border-left: 4px solid #ef4444; ';
   } else if (rowColor) {
@@ -924,7 +923,21 @@ function createRow(order, rowColor = null, hideTopBorder = false) {
       ? `<span class="text-red-400 font-bold">₹0 ⚠️ (RATE MISSING)</span>` 
       : `₹${esc(order.unit_price)}`;
 
+  // --- 🚨 JADOO: DATE COLUMN LOGIC 🚨 ---
+  let dateHtml = '';
+  if (!hideTopBorder && order.date) {
+      // Date ko DD Month YYYY format mein banaya gaya hai
+      let [y, m, d] = order.date.split('-');
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      let displayDate = (d && m && y) ? `${d} ${monthNames[parseInt(m)-1]} ${y}` : order.date;
+      dateHtml = `<div class="font-bold text-slate-300 tracking-wide">${displayDate}</div>`;
+  }
+
   tr.innerHTML = `
+    <!-- NAYA DATE COLUMN DATA -->
+    <td class="px-4 py-3 text-xs whitespace-nowrap">
+      ${dateHtml}
+    </td>
     <td class="px-4 py-3 font-medium" style="color:#60a5fa;">
       #${esc(order.order_id)}
       ${timeHtml}
