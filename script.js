@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 23.0 Loaded! Default Delivery 10 + Smart Shift Sync Active.");
+console.log("App Version 25.0 Loaded! Multi-Color Order Grouping Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -506,13 +506,8 @@ window.openNewOrderModal = function() {
     if (form) form.reset(); 
     
     if ($('p-time')) $('p-time').value = '';
-    
-    // --- 🚨 JADOO 1: 10 RS DELIVERY CHARGE DEFAULT 🚨 ---
-    if ($('p-del-charge')) {
-        $('p-del-charge').value = '10';
-    }
+    if ($('p-del-charge')) $('p-del-charge').value = '10';
 
-    // --- 🚨 JADOO 2: SMART SHIFT SYNC 🚨 ---
     const mainShift = $('shift-filter') ? $('shift-filter').value : 'All';
     if ($('p-shift')) {
         if (mainShift !== 'All') {
@@ -552,8 +547,6 @@ window.openNewOrderModal = function() {
     }
     premRestCount = 1;
     
-    // --- 🚨 JADOO 3: TURANT TOTAL CALCULATION 🚨 ---
-    // Taaki khulte hi form mein Delivery aur Order Total 10 Rs dikh jaye
     if (typeof calcPremiumTotal === 'function') {
         calcPremiumTotal();
     } else {
@@ -845,18 +838,66 @@ function renderOrders() {
   if($('empty-state')) $('empty-state').classList.add('hidden');
   const fragment = document.createDocumentFragment();
   
-  for (let i = filtered.length - 1; i >= 0; i--) { fragment.appendChild(createRow(filtered[i])); }
+  // --- 🚨 JADOO: MULTI-COLOR LOGIC 🚨 ---
+  const colorPalette = [
+      'rgba(99, 102, 241, 0.1)',   // Indigo (Blue tint)
+      'rgba(16, 185, 129, 0.1)',   // Emerald (Green tint)
+      'rgba(245, 158, 11, 0.1)',   // Amber (Yellow/Orange tint)
+      'rgba(244, 63, 94, 0.1)',    // Rose (Pink/Red tint)
+      'rgba(6, 182, 212, 0.1)',    // Cyan (Light blue tint)
+      'rgba(168, 85, 247, 0.1)'    // Purple tint
+  ];
+  let colorIndex = 0;
+  const assignedColors = {};
+
+  const orderCounts = {};
+  filtered.forEach(o => {
+      let id = o.order_id || o.__backendId;
+      orderCounts[id] = (orderCounts[id] || 0) + 1;
+  });
+
+  let prevVisualOrderId = null;
+
+  for (let i = filtered.length - 1; i >= 0; i--) { 
+      let currentOrder = filtered[i];
+      let currentId = currentOrder.order_id || currentOrder.__backendId;
+      
+      let isMulti = orderCounts[currentId] > 1;
+      let hideTopBorder = isMulti && (prevVisualOrderId === currentId);
+      let rowColor = null;
+
+      if (isMulti) {
+          if (!assignedColors[currentId]) {
+              assignedColors[currentId] = colorPalette[colorIndex % colorPalette.length];
+              colorIndex++;
+          }
+          rowColor = assignedColors[currentId];
+      }
+      
+      fragment.appendChild(createRow(currentOrder, rowColor, hideTopBorder));
+      prevVisualOrderId = currentId;
+  }
+  
   if(tbody) { tbody.innerHTML = ''; tbody.appendChild(fragment); }
 }
 
-function createRow(order) {
+function createRow(order, rowColor = null, hideTopBorder = false) {
   const tr = document.createElement('tr'); 
   
   let isZeroRate = parseFloat(order.unit_price) === 0;
-  let rowStyle = 'border-top:1px solid #1e2030;';
+  let rowStyle = '';
   
+  if (hideTopBorder) {
+      rowStyle += 'border-top: 1px dashed rgba(148, 163, 184, 0.2); '; 
+  } else {
+      rowStyle += 'border-top: 1px solid #1e2030; '; 
+  }
+
+  // ALAG-ALAG RANG (MULTI-COLOR) HIGHLIGHT
   if (isZeroRate) {
-      rowStyle += ' background-color: rgba(239, 68, 68, 0.15); border-left: 4px solid #ef4444;';
+      rowStyle += 'background-color: rgba(239, 68, 68, 0.15); border-left: 4px solid #ef4444; ';
+  } else if (rowColor) {
+      rowStyle += `background-color: ${rowColor}; border-left: 2px solid ${rowColor.replace('0.1)', '0.5)')}; `; 
   }
   
   tr.style.cssText = rowStyle;
