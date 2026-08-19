@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 26.0 Loaded! Date Column & Smart Grouping Active.");
+console.log("App Version 27.0 Loaded! Automatic 5% GST for AR Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -361,9 +361,18 @@ window.autoFillRate = function(inp) {
     if(match && rInp.value != match.rate) { rInp.value = match.rate; if(inp.closest('#edit-modal')) calcEditTotal(); else calcPremiumTotal(); inp.style.borderColor = '#10b981'; setTimeout(() => inp.style.borderColor = '', 1000); }
   }
 };
-window.autoFillAllItemsInBlock = function(rInp) { const b = rInp.closest('.rest-block'); if(!b) return; b.querySelectorAll('.item-name').forEach(i => autoFillRate(i)); };
+
+window.autoFillAllItemsInBlock = function(rInp) { 
+  const b = rInp.closest('.rest-block'); if(!b) return; 
+  b.querySelectorAll('.item-name').forEach(i => autoFillRate(i)); 
+  
+  // AR GST UPDATE ON RESTAURANT NAME CHANGE
+  if (rInp.closest('#edit-modal')) { if(typeof calcEditTotal === 'function') calcEditTotal(); } 
+  else { if(typeof calcPremiumTotal === 'function') calcPremiumTotal(); }
+};
 
 window.toggleEditSplitFields = function() { const mode = $('edit-payment-status').value; if (mode === 'Split') $('edit-split-inputs').classList.remove('hidden'); else $('edit-split-inputs').classList.add('hidden'); };
+
 window.addEditItem = function(rId) {
   const c = document.getElementById(`edit-items-rest-${rId}`), d = document.createElement('div'); d.className = 'item-row flex gap-2 items-start';
   d.innerHTML = `<div class="flex-1"><label class="block text-[10px] text-slate-500 mb-1">Item Name</label><input type="text" class="item-name w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" oninput="autoFillRate(this)"></div><div class="w-24"><label class="block text-[10px] text-slate-500 mb-1">Rate (₹)</label><input type="number" class="item-rate w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" min="0" oninput="if(typeof calcEditTotal === 'function') calcEditTotal()"></div><div class="w-20"><label class="block text-[10px] text-slate-500 mb-1">Qty</label><input type="number" class="item-qty w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none" value="1" min="1" oninput="if(typeof calcEditTotal === 'function') calcEditTotal()"></div><button type="button" class="mt-5 p-2 text-slate-500 hover:text-red-500" onclick="removeEditItem(this)">✕</button>`;
@@ -377,16 +386,39 @@ window.addEditRestaurant = function() {
 window.removeEditItem = function(btn) { btn.parentElement.remove(); if(typeof calcEditTotal === 'function') calcEditTotal(); };
 window.removeEditRest = function(btn) { btn.parentElement.remove(); if(typeof calcEditTotal === 'function') calcEditTotal(); };
 
+// --- 🚨 JADOO: AR GST CALCULATION (EDIT FORM) 🚨 ---
 window.calcEditTotal = function() {
-  let tot = 0; 
-  document.querySelectorAll('#edit-restaurants-wrapper .item-row').forEach(r => { 
-      tot += ((parseFloat(r.querySelector('.item-rate').value) || 0) * (parseFloat(r.querySelector('.item-qty').value) || 0)); 
+  let baseTot = 0; 
+  let gstTot = 0;
+  
+  document.querySelectorAll('#edit-restaurants-wrapper .rest-block').forEach(b => { 
+      const rName = b.querySelector('.rest-name').value.trim().toLowerCase();
+      const isAR = rName === 'ar';
+      
+      b.querySelectorAll('.item-row').forEach(r => {
+          let itemTot = ((parseFloat(r.querySelector('.item-rate').value) || 0) * (parseFloat(r.querySelector('.item-qty').value) || 0));
+          baseTot += itemTot;
+          if (isAR) { gstTot += itemTot * 0.05; } // AR pe 5% tax
+      }); 
   });
+  
   const delInput = $('edit-del-charge');
   const del = delInput ? (parseFloat(delInput.value) || 0) : 0; 
-  const g = tot + del;
+  const g = baseTot + gstTot + del;
   
-  if ($('edit-subtotal')) $('edit-subtotal').textContent = '₹' + tot.toLocaleString('en-IN', { minimumFractionDigits: 2 }); 
+  if ($('edit-subtotal')) $('edit-subtotal').textContent = '₹' + baseTot.toLocaleString('en-IN', { minimumFractionDigits: 2 }); 
+  
+  if ($('edit-gst-row') && $('edit-gst-display')) {
+      if (gstTot > 0) {
+          $('edit-gst-row').classList.remove('hidden');
+          $('edit-gst-row').classList.add('flex');
+          $('edit-gst-display').textContent = '+ ₹' + gstTot.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      } else {
+          $('edit-gst-row').classList.remove('flex');
+          $('edit-gst-row').classList.add('hidden');
+      }
+  }
+
   if ($('edit-delivery-display')) $('edit-delivery-display').textContent = '₹' + del.toLocaleString('en-IN', { minimumFractionDigits: 2 }); 
   if ($('edit-grand-total')) $('edit-grand-total').textContent = '₹' + g.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 };
@@ -469,9 +501,22 @@ window.handleFullEditSubmit = async function(event) {
     let finalItems = [];
     document.querySelectorAll('#edit-restaurants-wrapper .rest-block').forEach(b => {
       const rName = b.querySelector('.rest-name').value.trim();
-      if(rName) { b.querySelectorAll('.item-row').forEach(row => { const bId = row.dataset.backendId || null, name = row.querySelector('.item-name').value.trim(), rate = parseFloat(row.querySelector('.item-rate').value) || 0, qty = parseFloat(row.querySelector('.item-qty').value) || 1; 
-      if(name && rate >= 0) finalItems.push({ __backendId: bId, name, rate, qty, total: rate*qty, restaurant: rName }); }); }
+      if(rName) { 
+          const isAR = rName.toLowerCase() === 'ar';
+          b.querySelectorAll('.item-row').forEach(row => { 
+              const bId = row.dataset.backendId || null;
+              const name = row.querySelector('.item-name').value.trim();
+              const rate = parseFloat(row.querySelector('.item-rate').value) || 0;
+              const qty = parseFloat(row.querySelector('.item-qty').value) || 1; 
+              if(name && rate >= 0) {
+                  let itemBaseTotal = rate * qty;
+                  let itemFinalTotal = isAR ? itemBaseTotal * 1.05 : itemBaseTotal; // AR pe 5% GST automatically DB me save
+                  finalItems.push({ __backendId: bId, name, rate, qty, total: itemFinalTotal, restaurant: rName }); 
+              }
+          }); 
+      }
     });
+    
     if(finalItems.length === 0) throw new Error("At least one item is required!");
     const pMode = $('edit-payment-status').value, addr = $('edit-address').value.trim(), cont = $('edit-contact').value.trim(), rider = $('edit-rider').value.trim(), shift = $('edit-shift').value, dChg = parseFloat($('edit-del-charge').value) || 0;
     
@@ -487,6 +532,7 @@ window.handleFullEditSubmit = async function(event) {
     let sIds = finalItems.map(i => i.__backendId).filter(id => id !== null), oIds = originalOrderItems.map(i => i.__backendId), delIds = oIds.filter(id => !sIds.includes(id));
     for(let id of delIds) { await dbOrders.child(id).remove(); }
     const oDate = originalOrderItems[0].date || getLocalIsoDate(); let isFirst = true;
+    
     for(let i of finalItems) {
       let stat = "Payment Pending"; if(pMode === "UPI Done" || pMode === "Cash" || pMode === "Split") stat = "Delivered";
       let itemPaymentStatus = isFirst ? fPMode : pMode; 
@@ -574,10 +620,40 @@ window.addPremiumRestaurant = function() {
 };
 window.removePremiumRest = function(btn) { btn.parentElement.remove(); calcPremiumTotal(); };
 
+// --- 🚨 JADOO: AR GST CALCULATION (NEW FORM) 🚨 ---
 window.calcPremiumTotal = function() {
-  let total = 0; document.querySelectorAll('#restaurants-wrapper .item-row').forEach(row => { total += ((parseFloat(row.querySelector('.item-rate').value) || 0) * (parseFloat(row.querySelector('.item-qty').value) || 0)); });
-  const delCharge = parseFloat($('p-del-charge').value) || 0; const grandTotal = total + delCharge;
-  $('p-subtotal').textContent = '₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2 }); $('p-delivery-display').textContent = '₹' + delCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 }); $('p-grand-total').textContent = '₹' + grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  let baseTot = 0; 
+  let gstTot = 0;
+  
+  document.querySelectorAll('#restaurants-wrapper .rest-block').forEach(b => { 
+      const rName = b.querySelector('.rest-name').value.trim().toLowerCase();
+      const isAR = rName === 'ar';
+      
+      b.querySelectorAll('.item-row').forEach(r => { 
+          let itemTot = ((parseFloat(r.querySelector('.item-rate').value) || 0) * (parseFloat(r.querySelector('.item-qty').value) || 0)); 
+          baseTot += itemTot;
+          if (isAR) { gstTot += itemTot * 0.05; } // AR pe 5% tax
+      }); 
+  });
+  
+  const delCharge = parseFloat($('p-del-charge').value) || 0; 
+  const grandTotal = baseTot + gstTot + delCharge;
+  
+  $('p-subtotal').textContent = '₹' + baseTot.toLocaleString('en-IN', { minimumFractionDigits: 2 }); 
+  
+  if ($('p-gst-row') && $('p-gst-display')) {
+      if (gstTot > 0) {
+          $('p-gst-row').classList.remove('hidden');
+          $('p-gst-row').classList.add('flex');
+          $('p-gst-display').textContent = '+ ₹' + gstTot.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      } else {
+          $('p-gst-row').classList.remove('flex');
+          $('p-gst-row').classList.add('hidden');
+      }
+  }
+
+  $('p-delivery-display').textContent = '₹' + delCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 }); 
+  $('p-grand-total').textContent = '₹' + grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 };
 
 window.handlePremiumFormSubmit = async function(event) {
@@ -589,9 +665,21 @@ window.handlePremiumFormSubmit = async function(event) {
     const restBlocks = document.querySelectorAll('#restaurants-wrapper .rest-block'); let allItems = [];
     restBlocks.forEach(block => {
       const restName = block.querySelector('.rest-name').value.trim();
-      if (restName) { block.querySelectorAll('.item-row').forEach(row => { const name = row.querySelector('.item-name').value.trim(), rate = parseFloat(row.querySelector('.item-rate').value) || 0, qty = parseFloat(row.querySelector('.item-qty').value) || 1; 
-      if (name && rate >= 0) allItems.push({ name, rate, qty, total: rate * qty, restaurant: restName }); }); }
+      if (restName) { 
+          const isAR = restName.toLowerCase() === 'ar';
+          block.querySelectorAll('.item-row').forEach(row => { 
+              const name = row.querySelector('.item-name').value.trim();
+              const rate = parseFloat(row.querySelector('.item-rate').value) || 0;
+              const qty = parseFloat(row.querySelector('.item-qty').value) || 1; 
+              if (name && rate >= 0) {
+                  let itemBaseTotal = rate * qty;
+                  let itemFinalTotal = isAR ? itemBaseTotal * 1.05 : itemBaseTotal; // AR pe 5% GST automatically DB me save
+                  allItems.push({ name, rate, qty, total: itemFinalTotal, restaurant: restName }); 
+              }
+          }); 
+      }
     });
+    
     if (allItems.length === 0) throw new Error("Add at least one item!");
     
     const pMode = $('p-payment').value, cont = $('p-contact').value.trim(), addr = $('p-address').value.trim(), rider = $('p-rider').value.trim(), shift = $('p-shift').value, delChg = parseFloat($('p-del-charge').value) || 0;
@@ -873,7 +961,6 @@ function renderOrders() {
           rowColor = assignedColors[currentId];
       }
       
-      // --- 🚨 JADOO: DATE HIDDEN IN SUBSEQUENT ROWS 🚨 ---
       fragment.appendChild(createRow(currentOrder, rowColor, hideTopBorder));
       prevVisualOrderId = currentId;
   }
@@ -919,14 +1006,16 @@ function createRow(order, rowColor = null, hideTopBorder = false) {
       timeHtml = `<div class="text-[10px] opacity-60 mt-1 tracking-wider">🕒 ${h}:${m} ${ampm}</div>`;
   }
   
+  // --- 🚨 JADOO: TABLE MEIN GST BADGE (AR KE LIYE) 🚨 ---
+  let isAR = String(order.customer_name).trim().toLowerCase() === 'ar';
+  let gstBadge = isAR ? ` <span class="text-[9px] font-bold text-red-400 border border-red-400/50 rounded px-1 ml-1" title="5% GST Added">+5% GST</span>` : '';
+
   let rateHtml = isZeroRate 
       ? `<span class="text-red-400 font-bold">₹0 ⚠️ (RATE MISSING)</span>` 
       : `₹${esc(order.unit_price)}`;
 
-  // --- 🚨 JADOO: DATE COLUMN LOGIC 🚨 ---
   let dateHtml = '';
   if (!hideTopBorder && order.date) {
-      // Date ko DD Month YYYY format mein banaya gaya hai
       let [y, m, d] = order.date.split('-');
       const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       let displayDate = (d && m && y) ? `${d} ${monthNames[parseInt(m)-1]} ${y}` : order.date;
@@ -934,7 +1023,6 @@ function createRow(order, rowColor = null, hideTopBorder = false) {
   }
 
   tr.innerHTML = `
-    <!-- NAYA DATE COLUMN DATA -->
     <td class="px-4 py-3 text-xs whitespace-nowrap">
       ${dateHtml}
     </td>
@@ -944,7 +1032,10 @@ function createRow(order, rowColor = null, hideTopBorder = false) {
     </td>
     <td class="px-4 py-3 font-bold text-white">${esc(order.customer_name)} <span class="text-[10px] opacity-70 ml-1">${shiftBadge}</span></td>
     <td class="px-4 py-3 text-xs"><div style="color:#f0ece4;">${esc(order.address)}</div><div style="color:#9ca3af;">${esc(order.contact)}</div></td>
-    <td class="px-4 py-3 text-xs"><div style="color:#f0ece4;">${esc(order.item_name)}</div><div style="color:#9ca3af;">${rateHtml} × ${esc(order.quantity)}</div></td>
+    
+    <!-- ITEM DETAIL MEIN BADGE LAGA HUA HAI -->
+    <td class="px-4 py-3 text-xs"><div style="color:#f0ece4;">${esc(order.item_name)}${gstBadge}</div><div style="color:#9ca3af;">${rateHtml} × ${esc(order.quantity)}</div></td>
+    
     <td class="px-4 py-3 text-xs" style="color:#9ca3af;">${esc(order.rider)}</td>
     <td class="px-4 py-3 text-right font-bold" style="color:${isZeroRate ? '#ef4444' : '#10b981'};">₹${(parseFloat(order.total) + parseFloat(order.delivery_charge || 0)).toFixed(2)}</td>
     <td class="px-4 py-3 text-center">
