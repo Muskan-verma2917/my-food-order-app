@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 27.0 Loaded! Automatic 5% GST for AR Active.");
+console.log("App Version 28.0 Loaded! Rocket Engine & Menu Sync Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -33,15 +33,19 @@ window.showToast = function(msg, type = 'success') {
 
 let allOrders = [], menuList = [], depositedCashData = {}, currentTotalCash = 0, cashSaveTimeout, editingMenuId = null; 
 let currentlyEditingOrderId = null, originalOrderItems = [], editRestCount = 0;
-let currentFilterDate = ''; 
 let currentShiftFilter = 'All', currentTableFilter = 'All', currentRestFilter = 'All', currentRiderFilter = 'All';
 let orderCounter = 0, pendingDelete = null;
 let menuCollapsedState = {};
 
-const defaultConfig = { app_title: 'Daily Delivery Sales', background_color: '#0f1117', primary_action_color: '#e85d3a' };
 const $ = id => document.getElementById(id);
 
-if ($('date-filter')) $('date-filter').value = '';
+// 🚀 JADOO 1: APP START HOTE HI DEFAULT DATE AAJ KI SET HOGI (Performance Boost)
+let currentFilterDate = getLocalIsoDate();
+if ($('date-filter')) {
+    $('date-filter').value = currentFilterDate;
+}
+
+const defaultConfig = { app_title: 'Daily Delivery Sales', background_color: '#0f1117', primary_action_color: '#e85d3a' };
 
 dbOrders.on('value', (snapshot) => {
   try {
@@ -270,6 +274,7 @@ document.addEventListener('DOMContentLoaded', function() {
   $('report-modal')?.addEventListener('click', e => { if (e.target === $('report-modal')) toggleReportModal(false); });
 });
 
+// 🚀 JADOO 2: SAME DAY MENU AUTO SYNC 
 window.handleMenuSubmit = async function(event) {
   if (event) event.preventDefault();
   const btn = $('menu-save-btn'); if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
@@ -277,7 +282,29 @@ window.handleMenuSubmit = async function(event) {
     const rest = $('menu-rest-input').value.trim(); const item = $('menu-item-input').value.trim(); const rate = parseFloat($('menu-rate-input').value) || 0; 
     if(!rest || !item) { showToast('Please fill Restaurant and Item Name!', 'error'); return; }
     if (editingMenuId) { 
-        await dbMenu.child(editingMenuId).update({ restaurant: rest, item: item, rate: rate }); showToast(`✅ ${item} updated!`); cancelMenuEdit(); 
+        await dbMenu.child(editingMenuId).update({ restaurant: rest, item: item, rate: rate }); 
+        
+        // AUTO SYNC LOGIC
+        const targetDate = $('date-filter') ? $('date-filter').value : getLocalIsoDate();
+        let ordersToSync = allOrders.filter(o => 
+            (o.date === targetDate || String(o.date).includes(targetDate)) && 
+            String(o.customer_name).toLowerCase() === rest.toLowerCase() && 
+            String(o.item_name).toLowerCase() === item.toLowerCase()
+        );
+        
+        for (let o of ordersToSync) {
+            let isAR = String(o.customer_name).toLowerCase() === 'ar';
+            let newBaseTot = rate * (parseFloat(o.quantity) || 1);
+            let newFinalTot = isAR ? newBaseTot * 1.05 : newBaseTot; // AR GST
+            await dbOrders.child(o.__backendId).update({ unit_price: rate, total: newFinalTot });
+        }
+        
+        if (ordersToSync.length > 0) {
+            showToast(`✅ Rate Updated & ${ordersToSync.length} orders of ${targetDate} Synced!`);
+        } else {
+            showToast(`✅ Menu Updated!`);
+        }
+        cancelMenuEdit(); 
     } else {
         const isDuplicate = menuList.some(m => (m.restaurant || '').toLowerCase() === rest.toLowerCase() && (m.item || '').toLowerCase() === item.toLowerCase());
         if (isDuplicate) { showToast(`⚠️ ${item} already added for ${rest}!`, 'error'); return; }
@@ -309,21 +336,24 @@ window.toggleMenuGroup = function(rName) {
     }
 };
 
+// 🚀 JADOO 3: ROCKET SPEED STRING BUILDER (Fixes Menu Master Hang Issue)
 window.renderMenuTable = function() {
-  const tbody = $('menu-list-body'); if(!tbody) return; tbody.innerHTML = '';
+  const tbody = $('menu-list-body'); if(!tbody) return; 
   const searchT = ($('menu-search-input') ? $('menu-search-input').value.trim().toLowerCase() : '');
   const filtered = menuList.filter(m => { if (!searchT) return true; return String(m.restaurant||'').toLowerCase().includes(searchT) || String(m.item||'').toLowerCase().includes(searchT); });
+  
   if(filtered.length === 0) { tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500">No match found</td></tr>`; return; }
 
   const groupedMenu = {};
   filtered.forEach(m => { let rName = m.restaurant || 'Unknown'; if(!groupedMenu[rName]) groupedMenu[rName] = []; groupedMenu[rName].push(m); });
 
+  let htmlStr = ''; 
   Object.keys(groupedMenu).sort((a,b)=>String(a).localeCompare(String(b),undefined,{sensitivity:'base'})).forEach(rName => {
       let isCollapsed = menuCollapsedState[rName] || false;
       let chevronIcon = isCollapsed ? 'chevron-right' : 'chevron-down';
       let safeRName = String(rName).replace(/[^a-zA-Z0-9]/g, '');
 
-      tbody.innerHTML += `
+      htmlStr += `
         <tr class="bg-[#181a24] border-t-2 border-b border-[#2d3139] cursor-pointer hover:bg-[#1e212b] transition-colors" onclick="toggleMenuGroup('${safeRName}')">
           <td colspan="3" class="px-4 py-2 font-black text-sm uppercase tracking-wider flex items-center gap-2" style="color:#ff5a36; user-select:none;">
             <i id="icon-${safeRName}" data-lucide="${chevronIcon}" style="width:16px;height:16px; transition: transform 0.2s;"></i>
@@ -337,7 +367,7 @@ window.renderMenuTable = function() {
       items.forEach(m => {
         let r = parseFloat(String(m.rate).replace(/[^\d.-]/g, '')); r = isNaN(r) ? 0 : r;
         let displayStyle = isCollapsed ? 'display: none;' : 'display: table-row;';
-        tbody.innerHTML += `
+        htmlStr += `
         <tr class="menu-item-row hover:bg-[#1e212b] transition-colors border-b border-slate-700/30 last:border-0" data-restaurant="${safeRName}" style="${displayStyle}">
           <td class="px-4 py-2.5 text-slate-300 font-medium pl-8 w-[50%]">» ${esc(m.item)}</td>
           <td class="px-4 py-2.5 text-right font-bold text-slate-100">₹${r}</td>
@@ -350,6 +380,8 @@ window.renderMenuTable = function() {
         </tr>`;
       });
   });
+  
+  tbody.innerHTML = htmlStr; 
   if (typeof lucide !== 'undefined') lucide.createIcons();
 };
 
@@ -365,8 +397,6 @@ window.autoFillRate = function(inp) {
 window.autoFillAllItemsInBlock = function(rInp) { 
   const b = rInp.closest('.rest-block'); if(!b) return; 
   b.querySelectorAll('.item-name').forEach(i => autoFillRate(i)); 
-  
-  // AR GST UPDATE ON RESTAURANT NAME CHANGE
   if (rInp.closest('#edit-modal')) { if(typeof calcEditTotal === 'function') calcEditTotal(); } 
   else { if(typeof calcPremiumTotal === 'function') calcPremiumTotal(); }
 };
@@ -386,7 +416,6 @@ window.addEditRestaurant = function() {
 window.removeEditItem = function(btn) { btn.parentElement.remove(); if(typeof calcEditTotal === 'function') calcEditTotal(); };
 window.removeEditRest = function(btn) { btn.parentElement.remove(); if(typeof calcEditTotal === 'function') calcEditTotal(); };
 
-// --- 🚨 JADOO: AR GST CALCULATION (EDIT FORM) 🚨 ---
 window.calcEditTotal = function() {
   let baseTot = 0; 
   let gstTot = 0;
@@ -398,7 +427,7 @@ window.calcEditTotal = function() {
       b.querySelectorAll('.item-row').forEach(r => {
           let itemTot = ((parseFloat(r.querySelector('.item-rate').value) || 0) * (parseFloat(r.querySelector('.item-qty').value) || 0));
           baseTot += itemTot;
-          if (isAR) { gstTot += itemTot * 0.05; } // AR pe 5% tax
+          if (isAR) { gstTot += itemTot * 0.05; } 
       }); 
   });
   
@@ -510,7 +539,7 @@ window.handleFullEditSubmit = async function(event) {
               const qty = parseFloat(row.querySelector('.item-qty').value) || 1; 
               if(name && rate >= 0) {
                   let itemBaseTotal = rate * qty;
-                  let itemFinalTotal = isAR ? itemBaseTotal * 1.05 : itemBaseTotal; // AR pe 5% GST automatically DB me save
+                  let itemFinalTotal = isAR ? itemBaseTotal * 1.05 : itemBaseTotal;
                   finalItems.push({ __backendId: bId, name, rate, qty, total: itemFinalTotal, restaurant: rName }); 
               }
           }); 
@@ -620,7 +649,6 @@ window.addPremiumRestaurant = function() {
 };
 window.removePremiumRest = function(btn) { btn.parentElement.remove(); calcPremiumTotal(); };
 
-// --- 🚨 JADOO: AR GST CALCULATION (NEW FORM) 🚨 ---
 window.calcPremiumTotal = function() {
   let baseTot = 0; 
   let gstTot = 0;
@@ -632,7 +660,7 @@ window.calcPremiumTotal = function() {
       b.querySelectorAll('.item-row').forEach(r => { 
           let itemTot = ((parseFloat(r.querySelector('.item-rate').value) || 0) * (parseFloat(r.querySelector('.item-qty').value) || 0)); 
           baseTot += itemTot;
-          if (isAR) { gstTot += itemTot * 0.05; } // AR pe 5% tax
+          if (isAR) { gstTot += itemTot * 0.05; } 
       }); 
   });
   
@@ -673,7 +701,7 @@ window.handlePremiumFormSubmit = async function(event) {
               const qty = parseFloat(row.querySelector('.item-qty').value) || 1; 
               if (name && rate >= 0) {
                   let itemBaseTotal = rate * qty;
-                  let itemFinalTotal = isAR ? itemBaseTotal * 1.05 : itemBaseTotal; // AR pe 5% GST automatically DB me save
+                  let itemFinalTotal = isAR ? itemBaseTotal * 1.05 : itemBaseTotal; 
                   allItems.push({ name, rate, qty, total: itemFinalTotal, restaurant: restName }); 
               }
           }); 
@@ -899,7 +927,8 @@ function updateStats() {
   }
 }
 
-function renderOrders() {
+// 🚀 JADOO 4: ROCKET SPEED TABLE RENDERER
+window.renderOrders = function() {
   const tbody = $('orders-body');
   const filtered = allOrders.filter(o => {
     const isDateMatch = !currentFilterDate || (o.date && String(o.date).includes(currentFilterDate));
@@ -924,7 +953,6 @@ function renderOrders() {
 
   if (filtered.length === 0) { if(tbody) tbody.innerHTML = ''; if($('empty-state')) $('empty-state').classList.remove('hidden'); return; }
   if($('empty-state')) $('empty-state').classList.add('hidden');
-  const fragment = document.createDocumentFragment();
   
   const colorPalette = [
       'rgba(99, 102, 241, 0.1)',   
@@ -944,6 +972,7 @@ function renderOrders() {
   });
 
   let prevVisualOrderId = null;
+  let htmlStr = ''; // String Builder for extreme speed
 
   for (let i = filtered.length - 1; i >= 0; i--) { 
       let currentOrder = filtered[i];
@@ -961,16 +990,14 @@ function renderOrders() {
           rowColor = assignedColors[currentId];
       }
       
-      fragment.appendChild(createRow(currentOrder, rowColor, hideTopBorder));
+      htmlStr += createRowHtml(currentOrder, rowColor, hideTopBorder);
       prevVisualOrderId = currentId;
   }
   
-  if(tbody) { tbody.innerHTML = ''; tbody.appendChild(fragment); }
+  if(tbody) { tbody.innerHTML = htmlStr; }
 }
 
-function createRow(order, rowColor = null, hideTopBorder = false) {
-  const tr = document.createElement('tr'); 
-  
+function createRowHtml(order, rowColor = null, hideTopBorder = false) {
   let isZeroRate = parseFloat(order.unit_price) === 0;
   let rowStyle = '';
   
@@ -985,8 +1012,6 @@ function createRow(order, rowColor = null, hideTopBorder = false) {
   } else if (rowColor) {
       rowStyle += `background-color: ${rowColor}; border-left: 2px solid ${rowColor.replace('0.1)', '0.5)')}; `; 
   }
-  
-  tr.style.cssText = rowStyle;
   
   const isConfirming = pendingDelete === order.__backendId;
   const statusColor = (order.payment_status === 'UPI Done') ? '#3b82f6' : (order.payment_status === 'Payment Pending') ? '#f59e0b' : (order.payment_status === 'Cash') ? '#10b981' : (order.payment_status && String(order.payment_status).includes('Split')) ? '#a855f7' : '#6b7084';
@@ -1006,7 +1031,6 @@ function createRow(order, rowColor = null, hideTopBorder = false) {
       timeHtml = `<div class="text-[10px] opacity-60 mt-1 tracking-wider">🕒 ${h}:${m} ${ampm}</div>`;
   }
   
-  // --- 🚨 JADOO: TABLE MEIN GST BADGE (AR KE LIYE) 🚨 ---
   let isAR = String(order.customer_name).trim().toLowerCase() === 'ar';
   let gstBadge = isAR ? ` <span class="text-[9px] font-bold text-red-400 border border-red-400/50 rounded px-1 ml-1" title="5% GST Added">+5% GST</span>` : '';
 
@@ -1016,13 +1040,21 @@ function createRow(order, rowColor = null, hideTopBorder = false) {
 
   let dateHtml = '';
   if (!hideTopBorder && order.date) {
-      let [y, m, d] = order.date.split('-');
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      let displayDate = (d && m && y) ? `${d} ${monthNames[parseInt(m)-1]} ${y}` : order.date;
-      dateHtml = `<div class="font-bold text-slate-300 tracking-wide">${displayDate}</div>`;
+      let parts = order.date.split('-');
+      if(parts.length === 3) {
+          let y = parts[0].length === 4 ? parts[0] : parts[2];
+          let m = parts[0].length === 4 ? parts[1] : parts[1];
+          let d = parts[0].length === 4 ? parts[2] : parts[0];
+          const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          let displayDate = `${d} ${monthNames[parseInt(m)-1]} ${y}`;
+          dateHtml = `<div class="font-bold text-slate-300 tracking-wide">${displayDate}</div>`;
+      } else {
+          dateHtml = `<div class="font-bold text-slate-300 tracking-wide">${order.date}</div>`;
+      }
   }
 
-  tr.innerHTML = `
+  return `
+  <tr style="${rowStyle}">
     <td class="px-4 py-3 text-xs whitespace-nowrap">
       ${dateHtml}
     </td>
@@ -1032,10 +1064,7 @@ function createRow(order, rowColor = null, hideTopBorder = false) {
     </td>
     <td class="px-4 py-3 font-bold text-white">${esc(order.customer_name)} <span class="text-[10px] opacity-70 ml-1">${shiftBadge}</span></td>
     <td class="px-4 py-3 text-xs"><div style="color:#f0ece4;">${esc(order.address)}</div><div style="color:#9ca3af;">${esc(order.contact)}</div></td>
-    
-    <!-- ITEM DETAIL MEIN BADGE LAGA HUA HAI -->
     <td class="px-4 py-3 text-xs"><div style="color:#f0ece4;">${esc(order.item_name)}${gstBadge}</div><div style="color:#9ca3af;">${rateHtml} × ${esc(order.quantity)}</div></td>
-    
     <td class="px-4 py-3 text-xs" style="color:#9ca3af;">${esc(order.rider)}</td>
     <td class="px-4 py-3 text-right font-bold" style="color:${isZeroRate ? '#ef4444' : '#10b981'};">₹${(parseFloat(order.total) + parseFloat(order.delivery_charge || 0)).toFixed(2)}</td>
     <td class="px-4 py-3 text-center">
@@ -1049,8 +1078,7 @@ function createRow(order, rowColor = null, hideTopBorder = false) {
     <td class="px-4 py-3 text-center">
       ${isConfirming ? `<div class="flex items-center justify-center gap-1"><button onclick="confirmDelete('${order.__backendId}')" class="rounded px-2 py-1 text-xs" style="background:#dc2626;color:#fff;">Confirm</button><button onclick="cancelDelete()" class="rounded px-2 py-1 text-xs" style="background:#2a2d3e;color:#6b7084;">Cancel</button></div>` : `<div class="flex items-center justify-center gap-3"><button onclick="openEditModal('${order.__backendId}')" class="rounded hover:bg-blue-500/20 p-1.5" style="color:#60a5fa;">✏️</button><button onclick="requestDelete('${order.__backendId}')" class="rounded hover:bg-red-500/20 p-1.5" style="color:#ef4444;">🗑️</button></div>`}
     </td>
-  `;
-  return tr;
+  </tr>`;
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
