@@ -8,8 +8,8 @@
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
   
-  <!-- VERSION 34.0 (DOUBTFUL RED FLAG 🚩 & NOTE ADDED) -->
-  <link rel="stylesheet" href="style.css?v=340">
+  <!-- VERSION 36.0 (SMART DUPLICATE CATCHER & HIGHLIGHT) -->
+  <link rel="stylesheet" href="style.css?v=360">
   <link rel="manifest" href="manifest.json">
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -26,7 +26,7 @@
     <div class="flex items-center gap-3 w-full lg:w-auto justify-center lg:justify-start">
      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="background:#e85d3a;"><i data-lucide="utensils" style="width:18px;height:18px;color:#fff;"></i></div>
      <h1 id="app-title" class="text-lg sm:text-xl font-bold flex items-center gap-2" style="font-family:'Playfair Display',serif;">
-       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v34.0</span>
+       Daily Delivery Sales <span class="text-[10px] text-[#ff5a36] border border-[#ff5a36] px-1.5 py-0.5 rounded-full font-sans tracking-widest uppercase">v36.0</span>
      </h1>
     </div>
     
@@ -372,7 +372,6 @@
         <input type="time" id="edit-upi-time" class="w-full bg-transparent border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-[#ff5a36] outline-none [color-scheme:dark]">
       </div>
 
-      <!-- 🚨 JADOO: NAYA DOUBTFUL FLAG & NOTE SECTION 🚨 -->
       <div class="md:col-span-2 mt-2 p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
         <div class="flex items-center gap-2 mb-2">
           <input type="checkbox" id="edit-doubtful" class="w-4 h-4 cursor-pointer accent-red-500">
@@ -400,7 +399,7 @@
    </div>
   </div>
 
-  <!-- NEW ORDER MODAL (Kept Normal) -->
+  <!-- NEW ORDER MODAL -->
   <div id="form-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
    <div class="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 shadow-2xl" style="background:#181a24; border:1px solid #1e2030;"><button type="button" onclick="toggleModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl">✕</button>
     <h2 class="text-xl font-bold mb-6" style="color:#f0ece4; font-family:'Playfair Display',serif;">Create New Order</h2>
@@ -461,6 +460,6 @@
    </div>
   </div>
 
-  <script src="script.js?v=340"></script>
+  <script src="script.js?v=360"></script>
  </body>
 </html>

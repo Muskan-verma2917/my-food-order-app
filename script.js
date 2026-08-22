@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 34.0 Loaded! Doubtful Flag & Note system active.");
+console.log("App Version 36.0 Loaded! Smart Duplicate Catcher Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -472,10 +472,7 @@ window.openEditModal = function(backendId) {
       if ($('edit-shift')) $('edit-shift').value = first.shift || 'Before Lunch';
       
       if ($('edit-time')) $('edit-time').value = first.order_time || '';
-      
       if ($('edit-upi-time')) $('edit-upi-time').value = first.upi_time || '';
-      
-      // 🚀 LOAD DOUBTFUL FLAG AND NOTE
       if ($('edit-doubtful')) $('edit-doubtful').checked = first.is_doubtful || false;
       if ($('edit-note')) $('edit-note').value = first.note || '';
       
@@ -553,8 +550,6 @@ window.handleFullEditSubmit = async function(event) {
     
     const oTime = $('edit-time') ? $('edit-time').value : '';
     const uTime = $('edit-upi-time') ? $('edit-upi-time').value : '';
-    
-    // 🚀 FETCH DOUBTFUL FLAG & NOTE
     const isDoubtful = $('edit-doubtful') ? $('edit-doubtful').checked : false;
     const orderNote = $('edit-note') ? $('edit-note').value.trim() : '';
 
@@ -576,7 +571,6 @@ window.handleFullEditSubmit = async function(event) {
       if (fPMode.includes('Split') && !isFirst) {
           itemPaymentStatus = "Split (Included in total)";
       }
-      // PUSHING FLAG AND NOTE TO DB
       let iData = { order_id: currentlyEditingOrderId, customer_name: i.restaurant, item_name: i.name, quantity: i.qty, unit_price: i.rate, total: i.total, status: stat, date: oDate, shift: shift, order_time: oTime, upi_time: uTime, is_doubtful: isDoubtful, note: orderNote, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? dChg : 0 };
       if(i.__backendId) { await dbOrders.child(i.__backendId).update(iData); } else { await dbOrders.push().set(iData); }
       isFirst = false;
@@ -588,11 +582,8 @@ window.handleFullEditSubmit = async function(event) {
 window.openNewOrderModal = function() {
     const form = $('new-premium-order-form');
     if (form) form.reset(); 
-    
     if ($('p-time')) $('p-time').value = '';
-    
     if ($('p-upi-time')) $('p-upi-time').value = '';
-    
     if ($('p-del-charge')) $('p-del-charge').value = '10';
 
     const mainShift = $('shift-filter') ? $('shift-filter').value : 'All';
@@ -725,7 +716,6 @@ window.handlePremiumFormSubmit = async function(event) {
     const pMode = $('p-payment').value, cont = $('p-contact').value.trim(), addr = $('p-address').value.trim(), rider = $('p-rider').value.trim(), shift = $('p-shift').value, delChg = parseFloat($('p-del-charge').value) || 0;
     
     const oTime = $('p-time') ? $('p-time').value : '';
-    
     const uTime = $('p-upi-time') ? $('p-upi-time').value : '';
 
     if (!pMode) throw new Error("Select Payment Mode!"); if (!addr) throw new Error("Address is required!");
@@ -733,6 +723,45 @@ window.handlePremiumFormSubmit = async function(event) {
     if (pMode === 'Split') { let sC = (parseFloat($('split-cash').value) || 0) + delChg, sU = parseFloat($('split-upi').value) || 0; fPMode = `Split: Cash ₹${sC.toFixed(2)} | UPI ₹${sU.toFixed(2)}`; }
     const oDate = $('date-filter').value || getLocalIsoDate();
     
+    // 🚨 JADOO: SMART DUPLICATE CATCHER 🚨
+    let duplicateFoundId = null;
+    let duplicateItemName = "";
+    for (let item of allItems) {
+        let match = allOrders.find(o => 
+            (o.date === oDate || String(o.date).includes(oDate)) &&
+            String(o.customer_name).toLowerCase() === String(item.restaurant).toLowerCase() &&
+            String(o.item_name).toLowerCase() === String(item.name).toLowerCase() &&
+            o.status !== 'Cancelled'
+        );
+        if (match) {
+            duplicateFoundId = match.__backendId;
+            duplicateItemName = item.name;
+            break; 
+        }
+    }
+
+    if (duplicateFoundId) {
+        const proceed = confirm(`⚠️ DUPLICATE ALERT!\n\n"${duplicateItemName}" for this restaurant is already added today.\n\nDo you still want to add a new one?`);
+        if (!proceed) {
+            toggleModal(false);
+            
+            // Highlight Table Row Animation
+            setTimeout(() => {
+                const row = document.getElementById(`row-${duplicateFoundId}`);
+                if (row) {
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const originalBg = row.style.backgroundColor;
+                    row.style.transition = 'background-color 0.5s ease';
+                    row.style.backgroundColor = 'rgba(234, 179, 8, 0.4)'; // Yellow Flash
+                    setTimeout(() => { row.style.backgroundColor = originalBg; }, 3000);
+                }
+            }, 300);
+            
+            if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Place Order'; }
+            return; 
+        }
+    }
+
     orderCounter++; await dbCounter.set(orderCounter); const cOrderId = String(orderCounter).padStart(3, '0'); let isFirst = true;
     for (const item of allItems) {
       let stat = "Payment Pending"; 
@@ -768,6 +797,25 @@ window.changeStatus = async function(bId, nPStat) {
   }
   
   await dbOrders.child(bId).update({ payment_status: nPStat, status: nStat }); showToast('Cloud Status updated'); 
+};
+
+window.toggleDoubtful = async function(bId) {
+    const order = allOrders.find(o => o.__backendId === bId);
+    if (!order) return;
+    let isDoubtful = order.is_doubtful === true || String(order.is_doubtful) === 'true';
+    
+    if (isDoubtful) {
+        if (confirm("Is the issue resolved? Remove Red Flag? 🚩")) {
+            await dbOrders.child(bId).update({ is_doubtful: false, note: '' });
+            showToast('✅ Doubt cleared! Flag removed.');
+        }
+    } else {
+        let reason = prompt("What is the doubt? (e.g., 20 Rs short, Fake screenshot)", order.note || "");
+        if (reason !== null) { 
+            await dbOrders.child(bId).update({ is_doubtful: true, note: reason.trim() });
+            showToast('🚩 Order marked as Doubtful!');
+        }
+    }
 };
 
 window.requestDelete = function(bId) { pendingDelete = bId; renderOrders(); };
@@ -968,7 +1016,7 @@ window.renderOrders = function() {
     if (currentTableFilter === 'UPI Verified') return o.payment_status === 'UPI Done' || String(o.payment_status || '').includes('Split'); 
     if (currentTableFilter === 'UPI Unverified') return o.payment_status === 'UPI (Unverified)';
     if (currentTableFilter === 'Cash') return o.payment_status === 'Cash' || String(o.payment_status||'').includes('Split');
-    if (currentTableFilter === 'Payment Pending') return o.payment_status === 'Payment Pending' || o.payment_status === 'Pending' || o.payment_status === 'UPI (Unverified)';
+    if (currentTableFilter === 'Payment Pending') return o.payment_status === 'Payment Pending' || o.payment_status === 'Pending';
     return false;
   });
 
@@ -1026,7 +1074,7 @@ window.renderOrders = function() {
 
 function createRowHtml(order, rowColor = null, hideTopBorder = false) {
   let isZeroRate = parseFloat(order.unit_price) === 0;
-  let isDoubtful = order.is_doubtful === true || order.is_doubtful === 'true'; 
+  let isDoubtful = order.is_doubtful === true || String(order.is_doubtful) === 'true'; 
   
   let rowStyle = '';
   
@@ -1036,9 +1084,8 @@ function createRowHtml(order, rowColor = null, hideTopBorder = false) {
       rowStyle += 'border-top: 1px solid #1e2030; '; 
   }
 
-  // 🚨 JADOO: RED FLAG OVERRIDE COLOR 🚨
   if (isDoubtful) {
-      rowStyle += 'background-color: rgba(239, 68, 68, 0.2) !important; border-left: 4px solid #ef4444 !important; ';
+      rowStyle += 'background-color: rgba(153, 27, 27, 0.4) !important; border-left: 4px solid #ef4444 !important; ';
   } else if (isZeroRate) {
       rowStyle += 'background-color: rgba(239, 68, 68, 0.15); border-left: 4px solid #ef4444; ';
   } else if (rowColor) {
@@ -1098,27 +1145,26 @@ function createRowHtml(order, rowColor = null, hideTopBorder = false) {
       }
   }
 
-  let noteDisplay = order.note ? `<div class="mt-1.5 text-[10px] font-bold ${isDoubtful ? 'text-red-300 bg-red-900/40' : 'text-slate-300 bg-[#16181f] border border-slate-600'} px-2 py-1 rounded inline-block w-fit max-w-[200px] truncate" title="${esc(order.note)}">📝 ${esc(order.note)}</div>` : '';
-  let flagHtml = isDoubtful ? `<span class="ml-1" title="Doubtful Order">🚩</span>` : '';
+  let noteDisplay = order.note ? `<div class="mt-1.5 text-[11px] font-bold ${isDoubtful ? 'text-red-200 bg-red-950/80 border border-red-500/50' : 'text-slate-300 bg-[#16181f] border border-slate-600'} px-2 py-1 rounded inline-block w-fit max-w-[200px] truncate" title="${esc(order.note)}">📝 ${esc(order.note)}</div>` : '';
+  let doubtFlagIconOpacity = isDoubtful ? 'opacity: 1; color: #ef4444;' : 'opacity: 0.4; color: #9ca3af; filter: grayscale(100%);';
 
+  // 🚨 JADOO: ROW MEIN ID ADD KI TAAKI SCROLL HO SAKE
   return `
-  <tr style="${rowStyle}">
+  <tr id="row-${order.__backendId}" style="${rowStyle}">
     <td class="px-4 py-3 text-xs whitespace-nowrap">
       ${dateHtml}
     </td>
     <td class="px-4 py-3 font-medium" style="color:#60a5fa;">
-      #${esc(order.order_id)}${flagHtml}
+      #${esc(order.order_id)}
       ${timeHtml}
     </td>
     <td class="px-4 py-3 font-bold text-white">${esc(order.customer_name)} <span class="text-[10px] opacity-70 ml-1">${shiftBadge}</span></td>
     <td class="px-4 py-3 text-xs"><div style="color:#f0ece4;">${esc(order.address)}</div><div style="color:#9ca3af;">${esc(order.contact)}</div></td>
-    
     <td class="px-4 py-3 text-xs">
       <div style="color:#f0ece4;">${esc(order.item_name)}${gstBadge}</div>
       <div style="color:#9ca3af;">${rateHtml} × ${esc(order.quantity)}</div>
       ${noteDisplay}
     </td>
-    
     <td class="px-4 py-3 text-xs" style="color:#9ca3af;">${esc(order.rider)}</td>
     <td class="px-4 py-3 text-right font-bold" style="color:${isZeroRate ? '#ef4444' : '#10b981'};">₹${(parseFloat(order.total) + parseFloat(order.delivery_charge || 0)).toFixed(2)}</td>
     <td class="px-4 py-3 text-center">
@@ -1132,7 +1178,14 @@ function createRowHtml(order, rowColor = null, hideTopBorder = false) {
       ${upiTimeHtml}
     </td>
     <td class="px-4 py-3 text-center">
-      ${isConfirming ? `<div class="flex items-center justify-center gap-1"><button onclick="confirmDelete('${order.__backendId}')" class="rounded px-2 py-1 text-xs" style="background:#dc2626;color:#fff;">Confirm</button><button onclick="cancelDelete()" class="rounded px-2 py-1 text-xs" style="background:#2a2d3e;color:#6b7084;">Cancel</button></div>` : `<div class="flex items-center justify-center gap-3"><button onclick="openEditModal('${order.__backendId}')" class="rounded hover:bg-blue-500/20 p-1.5" style="color:#60a5fa;">✏️</button><button onclick="requestDelete('${order.__backendId}')" class="rounded hover:bg-red-500/20 p-1.5" style="color:#ef4444;">🗑️</button></div>`}
+      ${isConfirming 
+        ? `<div class="flex items-center justify-center gap-1"><button onclick="confirmDelete('${order.__backendId}')" class="rounded px-2 py-1 text-xs" style="background:#dc2626;color:#fff;">Confirm</button><button onclick="cancelDelete()" class="rounded px-2 py-1 text-xs" style="background:#2a2d3e;color:#6b7084;">Cancel</button></div>` 
+        : `<div class="flex items-center justify-center gap-2">
+            <button onclick="toggleDoubtful('${order.__backendId}')" class="rounded hover:bg-red-500/20 p-1.5 transition-all" style="${doubtFlagIconOpacity}" title="Mark/Unmark as Doubtful">🚩</button>
+            <button onclick="openEditModal('${order.__backendId}')" class="rounded hover:bg-blue-500/20 p-1.5" style="color:#60a5fa;" title="Edit Order">✏️</button>
+            <button onclick="requestDelete('${order.__backendId}')" class="rounded hover:bg-red-500/20 p-1.5" style="color:#ef4444;" title="Delete Order">🗑️</button>
+           </div>`
+      }
     </td>
   </tr>`;
 }
