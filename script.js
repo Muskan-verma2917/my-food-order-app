@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 32.0 Loaded! New Filter Buttons Logic Active.");
+console.log("App Version 33.0 Loaded! UPI Time input active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -473,6 +473,9 @@ window.openEditModal = function(backendId) {
       
       if ($('edit-time')) $('edit-time').value = first.order_time || '';
       
+      // 🚀 LOAD UPI TIME IF EXISTS
+      if ($('edit-upi-time')) $('edit-upi-time').value = first.upi_time || '';
+      
       let tDel = 0; 
       originalOrderItems.forEach(o => tDel += (parseFloat(o.delivery_charge) || 0)); 
       if ($('edit-del-charge')) $('edit-del-charge').value = tDel;
@@ -546,6 +549,9 @@ window.handleFullEditSubmit = async function(event) {
     const pMode = $('edit-payment-status').value, addr = $('edit-address').value.trim(), cont = $('edit-contact').value.trim(), rider = $('edit-rider').value.trim(), shift = $('edit-shift').value, dChg = parseFloat($('edit-del-charge').value) || 0;
     
     const oTime = $('edit-time') ? $('edit-time').value : '';
+    
+    // 🚀 SAVE UPI TIME
+    const uTime = $('edit-upi-time') ? $('edit-upi-time').value : '';
 
     if(!pMode) throw new Error("Select Payment Mode!"); if(!addr) throw new Error("Delivery Address required!");
     let fPMode = pMode;
@@ -565,7 +571,7 @@ window.handleFullEditSubmit = async function(event) {
       if (fPMode.includes('Split') && !isFirst) {
           itemPaymentStatus = "Split (Included in total)";
       }
-      let iData = { order_id: currentlyEditingOrderId, customer_name: i.restaurant, item_name: i.name, quantity: i.qty, unit_price: i.rate, total: i.total, status: stat, date: oDate, shift: shift, order_time: oTime, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? dChg : 0 };
+      let iData = { order_id: currentlyEditingOrderId, customer_name: i.restaurant, item_name: i.name, quantity: i.qty, unit_price: i.rate, total: i.total, status: stat, date: oDate, shift: shift, order_time: oTime, upi_time: uTime, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? dChg : 0 };
       if(i.__backendId) { await dbOrders.child(i.__backendId).update(iData); } else { await dbOrders.push().set(iData); }
       isFirst = false;
     }
@@ -578,6 +584,10 @@ window.openNewOrderModal = function() {
     if (form) form.reset(); 
     
     if ($('p-time')) $('p-time').value = '';
+    
+    // 🚀 RESET UPI TIME ON NEW FORM
+    if ($('p-upi-time')) $('p-upi-time').value = '';
+    
     if ($('p-del-charge')) $('p-del-charge').value = '10';
 
     const mainShift = $('shift-filter') ? $('shift-filter').value : 'All';
@@ -710,6 +720,9 @@ window.handlePremiumFormSubmit = async function(event) {
     const pMode = $('p-payment').value, cont = $('p-contact').value.trim(), addr = $('p-address').value.trim(), rider = $('p-rider').value.trim(), shift = $('p-shift').value, delChg = parseFloat($('p-del-charge').value) || 0;
     
     const oTime = $('p-time') ? $('p-time').value : '';
+    
+    // 🚀 SAVE UPI TIME
+    const uTime = $('p-upi-time') ? $('p-upi-time').value : '';
 
     if (!pMode) throw new Error("Select Payment Mode!"); if (!addr) throw new Error("Address is required!");
     let fPMode = pMode;
@@ -726,7 +739,7 @@ window.handlePremiumFormSubmit = async function(event) {
           itemPaymentStatus = "Split (Included in total)";
       }
 
-      await dbOrders.push().set({ order_id: cOrderId, customer_name: item.restaurant, item_name: item.name, quantity: item.qty, unit_price: item.rate, total: item.total, status: stat, date: oDate, shift: shift, order_time: oTime, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? delChg : 0 });
+      await dbOrders.push().set({ order_id: cOrderId, customer_name: item.restaurant, item_name: item.name, quantity: item.qty, unit_price: item.rate, total: item.total, status: stat, date: oDate, shift: shift, order_time: oTime, upi_time: uTime, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? delChg : 0 });
       isFirst = false;
     }
     
@@ -895,7 +908,7 @@ function updateStats() {
   
   const deliveredCashOrders = activeOrders.filter(o => o.payment_status === 'Cash' || String(o.payment_status || '').includes('Split'));
   const deliveredUpiOrders = activeOrders.filter(o => o.payment_status === 'UPI Done' || String(o.payment_status || '').includes('Split'));
-  const pendingOrders = activeOrders.filter(o => o.payment_status === 'Payment Pending' || o.payment_status === 'Pending');
+  const pendingOrders = activeOrders.filter(o => o.payment_status === 'Payment Pending' || o.payment_status === 'UPI (Unverified)');
 
   if ($('stat-sales-inr')) $('stat-sales-inr').textContent = '₹' + pureSales.toFixed(2); if ($('stat-sales-delivery')) $('stat-sales-delivery').textContent = '₹' + totalWithDelivery.toFixed(2);
   if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = countUniqueOrders(deliveredCashOrders); if ($('stat-delivered-cash-total')) $('stat-delivered-cash-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
@@ -938,7 +951,6 @@ function updateStats() {
   }
 }
 
-// 🚨 JADOO: FILTERS LOGIC UPDATED ACCORDING TO NEW BUTTON NAMES
 window.renderOrders = function() {
   const tbody = $('orders-body');
   const filtered = allOrders.filter(o => {
@@ -1047,6 +1059,15 @@ function createRowHtml(order, rowColor = null, hideTopBorder = false) {
       timeHtml = `<div class="text-[10px] opacity-60 mt-1 tracking-wider">🕒 ${h}:${m} ${ampm}</div>`;
   }
   
+  // 🚀 JADOO: UPI TIME FORMATTING FOR TABLE
+  let upiTimeHtml = '';
+  if (order.upi_time) {
+      let [h, m] = order.upi_time.split(':');
+      let ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      upiTimeHtml = `<div class="text-[9px] text-blue-400 mt-1.5 font-bold tracking-wider">🏦 Bank: ${h}:${m} ${ampm}</div>`;
+  }
+  
   let isAR = String(order.customer_name).trim().toLowerCase() === 'ar';
   let gstBadge = isAR ? ` <span class="text-[9px] font-bold text-red-400 border border-red-400/50 rounded px-1 ml-1" title="5% GST Added">+5% GST</span>` : '';
 
@@ -1091,6 +1112,7 @@ function createRowHtml(order, rowColor = null, hideTopBorder = false) {
         <option value="Cash" ${displayPaymentStatus === 'Cash' ? 'selected' : ''} style="color:#10b981; background:#181a24;">Delivered (Cash)</option>
         ${(displayPaymentStatus.includes('Split')) ? `<option value="${esc(order.payment_status)}" selected style="color:#a855f7; background:#181a24;">Delivered (Split)</option>` : ''}
       </select>
+      ${upiTimeHtml} <!-- YAHAN RENDER HOGA TIME -->
     </td>
     <td class="px-4 py-3 text-center">
       ${isConfirming ? `<div class="flex items-center justify-center gap-1"><button onclick="confirmDelete('${order.__backendId}')" class="rounded px-2 py-1 text-xs" style="background:#dc2626;color:#fff;">Confirm</button><button onclick="cancelDelete()" class="rounded px-2 py-1 text-xs" style="background:#2a2d3e;color:#6b7084;">Cancel</button></div>` : `<div class="flex items-center justify-center gap-3"><button onclick="openEditModal('${order.__backendId}')" class="rounded hover:bg-blue-500/20 p-1.5" style="color:#60a5fa;">✏️</button><button onclick="requestDelete('${order.__backendId}')" class="rounded hover:bg-red-500/20 p-1.5" style="color:#ef4444;">🗑️</button></div>`}
