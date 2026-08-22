@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 28.0 Loaded! Rocket Engine & Menu Sync Active.");
+console.log("App Version 32.0 Loaded! New Filter Buttons Logic Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -39,7 +39,6 @@ let menuCollapsedState = {};
 
 const $ = id => document.getElementById(id);
 
-// 🚀 JADOO 1: APP START HOTE HI DEFAULT DATE AAJ KI SET HOGI (Performance Boost)
 let currentFilterDate = getLocalIsoDate();
 if ($('date-filter')) {
     $('date-filter').value = currentFilterDate;
@@ -274,7 +273,6 @@ document.addEventListener('DOMContentLoaded', function() {
   $('report-modal')?.addEventListener('click', e => { if (e.target === $('report-modal')) toggleReportModal(false); });
 });
 
-// 🚀 JADOO 2: SAME DAY MENU AUTO SYNC 
 window.handleMenuSubmit = async function(event) {
   if (event) event.preventDefault();
   const btn = $('menu-save-btn'); if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
@@ -284,7 +282,6 @@ window.handleMenuSubmit = async function(event) {
     if (editingMenuId) { 
         await dbMenu.child(editingMenuId).update({ restaurant: rest, item: item, rate: rate }); 
         
-        // AUTO SYNC LOGIC
         const targetDate = $('date-filter') ? $('date-filter').value : getLocalIsoDate();
         let ordersToSync = allOrders.filter(o => 
             (o.date === targetDate || String(o.date).includes(targetDate)) && 
@@ -295,7 +292,7 @@ window.handleMenuSubmit = async function(event) {
         for (let o of ordersToSync) {
             let isAR = String(o.customer_name).toLowerCase() === 'ar';
             let newBaseTot = rate * (parseFloat(o.quantity) || 1);
-            let newFinalTot = isAR ? newBaseTot * 1.05 : newBaseTot; // AR GST
+            let newFinalTot = isAR ? newBaseTot * 1.05 : newBaseTot; 
             await dbOrders.child(o.__backendId).update({ unit_price: rate, total: newFinalTot });
         }
         
@@ -336,7 +333,6 @@ window.toggleMenuGroup = function(rName) {
     }
 };
 
-// 🚀 JADOO 3: ROCKET SPEED STRING BUILDER (Fixes Menu Master Hang Issue)
 window.renderMenuTable = function() {
   const tbody = $('menu-list-body'); if(!tbody) return; 
   const searchT = ($('menu-search-input') ? $('menu-search-input').value.trim().toLowerCase() : '');
@@ -563,7 +559,8 @@ window.handleFullEditSubmit = async function(event) {
     const oDate = originalOrderItems[0].date || getLocalIsoDate(); let isFirst = true;
     
     for(let i of finalItems) {
-      let stat = "Payment Pending"; if(pMode === "UPI Done" || pMode === "Cash" || pMode === "Split") stat = "Delivered";
+      let stat = "Payment Pending"; 
+      if(pMode === "UPI Done" || pMode === "Cash" || pMode === "Split" || pMode === "UPI (Unverified)") stat = "Delivered";
       let itemPaymentStatus = isFirst ? fPMode : pMode; 
       if (fPMode.includes('Split') && !isFirst) {
           itemPaymentStatus = "Split (Included in total)";
@@ -721,7 +718,8 @@ window.handlePremiumFormSubmit = async function(event) {
     
     orderCounter++; await dbCounter.set(orderCounter); const cOrderId = String(orderCounter).padStart(3, '0'); let isFirst = true;
     for (const item of allItems) {
-      let stat = "Payment Pending"; if (pMode === "UPI Done" || pMode === "Cash" || pMode === "Split") stat = "Delivered";
+      let stat = "Payment Pending"; 
+      if (pMode === "UPI Done" || pMode === "Cash" || pMode === "Split" || pMode === "UPI (Unverified)") stat = "Delivered";
       
       let itemPaymentStatus = isFirst ? fPMode : pMode;
       if (fPMode.includes('Split') && !isFirst) {
@@ -743,9 +741,15 @@ window.handlePremiumFormSubmit = async function(event) {
 };
 
 window.changeStatus = async function(bId, nPStat) {
-  const idx = allOrders.findIndex(o => o.__backendId === bId); if (idx === -1) return; let o = allOrders[idx], oStat = String(o.payment_status || '');
-  if (oStat === 'UPI Done' || oStat.includes('Split')) { if (nPStat !== oStat) { showToast('🔒 Locked: Bank amount cannot be changed!', 'error'); renderOrders(); return; } }
-  let nStat = o.status; if (nPStat === 'UPI Done' || nPStat === 'Cash' || nPStat.includes('Split')) { nStat = 'Delivered'; } else if (nPStat === 'Payment Pending') { nStat = 'Payment Pending'; }
+  const idx = allOrders.findIndex(o => o.__backendId === bId); if (idx === -1) return; let o = allOrders[idx];
+  
+  let nStat = o.status; 
+  if (nPStat === 'UPI Done' || nPStat === 'Cash' || nPStat.includes('Split') || nPStat === 'UPI (Unverified)') { 
+      nStat = 'Delivered'; 
+  } else if (nPStat === 'Payment Pending') { 
+      nStat = 'Payment Pending'; 
+  }
+  
   await dbOrders.child(bId).update({ payment_status: nPStat, status: nStat }); showToast('Cloud Status updated'); 
 };
 
@@ -820,14 +824,13 @@ function updateStats() {
       if (stat === 'UPI Done') { 
           upiTotal += grp.totalValue; 
           riderUpiData[rider] += grp.totalValue;
-          riderTotalDeliveredData[rider] += grp.totalValue;
+          riderTotalDeliveredData[rider] += grp.totalValue; 
       }
       else if (stat === 'Cash') { 
           cashTotal += grp.totalValue; 
           riderCashData[rider] += grp.totalValue;
-          riderTotalDeliveredData[rider] += grp.totalValue;
       }
-      else if (stat === 'Payment Pending') { 
+      else if (stat === 'Payment Pending' || stat === 'UPI (Unverified)') { 
           pendingTotal += grp.totalValue; 
       }
       else if (stat.includes('Split')) {
@@ -842,13 +845,13 @@ function updateStats() {
           
           riderCashData[rider] += sC;
           riderUpiData[rider] += sU;
-          riderTotalDeliveredData[rider] += (sC + sU);
+          riderTotalDeliveredData[rider] += sU; 
       }
   });
 
   if ($('total-breakdown-content')) {
       if (Object.keys(riderTotalDeliveredData).length === 0 || Object.values(riderTotalDeliveredData).every(v => v === 0)) {
-          $('total-breakdown-content').innerHTML = '<div class="text-slate-500 italic mt-1">No deliveries yet</div>';
+          $('total-breakdown-content').innerHTML = '<div class="text-slate-500 italic mt-1">No UPI deliveries yet</div>';
       } else {
           let html = '';
           for (let r in riderTotalDeliveredData) {
@@ -888,13 +891,21 @@ function updateStats() {
       }
   }
 
-  const activeOrders = filteredData.filter(o => o.status !== 'Cancelled'), deliveredCashOrders = activeOrders.filter(o => o.payment_status === 'Cash' || String(o.payment_status || '').includes('Split')), deliveredUpiOrders = activeOrders.filter(o => o.payment_status === 'UPI Done' || String(o.payment_status || '').includes('Split')), allDeliveredOrders = activeOrders.filter(o => o.status === 'Delivered'), pendingOrders = activeOrders.filter(o => o.payment_status === 'Payment Pending');
+  const activeOrders = filteredData.filter(o => o.status !== 'Cancelled');
+  
+  const deliveredCashOrders = activeOrders.filter(o => o.payment_status === 'Cash' || String(o.payment_status || '').includes('Split'));
+  const deliveredUpiOrders = activeOrders.filter(o => o.payment_status === 'UPI Done' || String(o.payment_status || '').includes('Split'));
+  const pendingOrders = activeOrders.filter(o => o.payment_status === 'Payment Pending' || o.payment_status === 'Pending');
 
   if ($('stat-sales-inr')) $('stat-sales-inr').textContent = '₹' + pureSales.toFixed(2); if ($('stat-sales-delivery')) $('stat-sales-delivery').textContent = '₹' + totalWithDelivery.toFixed(2);
   if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = countUniqueOrders(deliveredCashOrders); if ($('stat-delivered-cash-total')) $('stat-delivered-cash-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   currentTotalCash = cashTotal; updatePendingCashUI();
+  
   if ($('stat-delivered-upi')) $('stat-delivered-upi').textContent = countUniqueOrders(deliveredUpiOrders); if ($('stat-delivered-upi-total')) $('stat-delivered-upi-total').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  if ($('stat-delivered')) $('stat-delivered-total').textContent = '₹' + (cashTotal + upiTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  
+  if ($('stat-delivered')) $('stat-delivered').textContent = countUniqueOrders(deliveredUpiOrders); 
+  if ($('stat-delivered-total')) $('stat-delivered-total').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  
   if ($('stat-payment-pending')) $('stat-payment-pending').textContent = countUniqueOrders(pendingOrders); if ($('stat-payment-pending-total')) $('stat-payment-pending-total').textContent = '₹' + pendingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   if ($('stat-total-orders')) $('stat-total-orders').textContent = countUniqueOrders(activeOrders);
 
@@ -927,7 +938,7 @@ function updateStats() {
   }
 }
 
-// 🚀 JADOO 4: ROCKET SPEED TABLE RENDERER
+// 🚨 JADOO: FILTERS LOGIC UPDATED ACCORDING TO NEW BUTTON NAMES
 window.renderOrders = function() {
   const tbody = $('orders-body');
   const filtered = allOrders.filter(o => {
@@ -938,9 +949,9 @@ window.renderOrders = function() {
     return isDateMatch && isShiftMatch && isRestMatch && isRiderMatch;
   }).filter(o => {
     if (currentTableFilter === 'All') return true;
-    if (currentTableFilter === 'Delivered (Total)') return o.status === 'Delivered';
-    if (currentTableFilter === 'Delivered (Cash)') return o.payment_status === 'Cash' || String(o.payment_status||'').includes('Split');
-    if (currentTableFilter === 'Delivered (UPI)') return o.payment_status === 'UPI Done' || String(o.payment_status||'').includes('Split');
+    if (currentTableFilter === 'UPI Verified') return o.payment_status === 'UPI Done' || String(o.payment_status || '').includes('Split'); 
+    if (currentTableFilter === 'UPI Unverified') return o.payment_status === 'UPI (Unverified)';
+    if (currentTableFilter === 'Cash') return o.payment_status === 'Cash' || String(o.payment_status||'').includes('Split');
     if (currentTableFilter === 'Payment Pending') return o.payment_status === 'Payment Pending' || o.payment_status === 'Pending';
     return false;
   });
@@ -972,7 +983,7 @@ window.renderOrders = function() {
   });
 
   let prevVisualOrderId = null;
-  let htmlStr = ''; // String Builder for extreme speed
+  let htmlStr = ''; 
 
   for (let i = filtered.length - 1; i >= 0; i--) { 
       let currentOrder = filtered[i];
@@ -1014,7 +1025,12 @@ function createRowHtml(order, rowColor = null, hideTopBorder = false) {
   }
   
   const isConfirming = pendingDelete === order.__backendId;
-  const statusColor = (order.payment_status === 'UPI Done') ? '#3b82f6' : (order.payment_status === 'Payment Pending') ? '#f59e0b' : (order.payment_status === 'Cash') ? '#10b981' : (order.payment_status && String(order.payment_status).includes('Split')) ? '#a855f7' : '#6b7084';
+  
+  const statusColor = (order.payment_status === 'UPI Done') ? '#3b82f6' : 
+                      (order.payment_status === 'UPI (Unverified)') ? '#06b6d4' : 
+                      (order.payment_status === 'Payment Pending') ? '#f59e0b' : 
+                      (order.payment_status === 'Cash') ? '#10b981' : 
+                      (order.payment_status && String(order.payment_status).includes('Split')) ? '#a855f7' : '#6b7084';
   
   const shiftBadge = order.shift === 'After Lunch' ? '🌙' : (order.shift === 'Before Lunch' ? '☀️' : (order.shift === 'No Lunch Break' ? '⚡' : ''));
 
@@ -1070,8 +1086,9 @@ function createRowHtml(order, rowColor = null, hideTopBorder = false) {
     <td class="px-4 py-3 text-center">
       <select onchange="changeStatus('${order.__backendId}', this.value)" class="bg-transparent border rounded px-2 py-1 outline-none text-xs font-semibold cursor-pointer" style="border-color:${statusColor}; color:${statusColor};">
         <option value="Payment Pending" ${displayPaymentStatus === 'Payment Pending' ? 'selected' : ''} style="color:#f59e0b; background:#181a24;">Payment Pending</option>
+        <option value="UPI (Unverified)" ${displayPaymentStatus === 'UPI (Unverified)' ? 'selected' : ''} style="color:#06b6d4; background:#181a24;">UPI (Unverified) ⏳</option>
+        <option value="UPI Done" ${displayPaymentStatus === 'UPI Done' ? 'selected' : ''} style="color:#3b82f6; background:#181a24;">Delivered (UPI) ✅</option>
         <option value="Cash" ${displayPaymentStatus === 'Cash' ? 'selected' : ''} style="color:#10b981; background:#181a24;">Delivered (Cash)</option>
-        <option value="UPI Done" ${displayPaymentStatus === 'UPI Done' ? 'selected' : ''} style="color:#3b82f6; background:#181a24;">Delivered (UPI)</option>
         ${(displayPaymentStatus.includes('Split')) ? `<option value="${esc(order.payment_status)}" selected style="color:#a855f7; background:#181a24;">Delivered (Split)</option>` : ''}
       </select>
     </td>
