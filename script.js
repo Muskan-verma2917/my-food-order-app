@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 36.0 Loaded! Smart Duplicate Catcher Active.");
+console.log("App Version 40.0 Loaded! STRICT Hard Block for Duplicates Active.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -473,6 +473,7 @@ window.openEditModal = function(backendId) {
       
       if ($('edit-time')) $('edit-time').value = first.order_time || '';
       if ($('edit-upi-time')) $('edit-upi-time').value = first.upi_time || '';
+      
       if ($('edit-doubtful')) $('edit-doubtful').checked = first.is_doubtful || false;
       if ($('edit-note')) $('edit-note').value = first.note || '';
       
@@ -550,8 +551,9 @@ window.handleFullEditSubmit = async function(event) {
     
     const oTime = $('edit-time') ? $('edit-time').value : '';
     const uTime = $('edit-upi-time') ? $('edit-upi-time').value : '';
-    const isDoubtful = $('edit-doubtful') ? $('edit-doubtful').checked : false;
-    const orderNote = $('edit-note') ? $('edit-note').value.trim() : '';
+
+    let existingNote = originalOrderItems[0].note || '';
+    let existingIsDoubtful = originalOrderItems[0].is_doubtful || false;
 
     if(!pMode) throw new Error("Select Payment Mode!"); if(!addr) throw new Error("Delivery Address required!");
     let fPMode = pMode;
@@ -571,7 +573,7 @@ window.handleFullEditSubmit = async function(event) {
       if (fPMode.includes('Split') && !isFirst) {
           itemPaymentStatus = "Split (Included in total)";
       }
-      let iData = { order_id: currentlyEditingOrderId, customer_name: i.restaurant, item_name: i.name, quantity: i.qty, unit_price: i.rate, total: i.total, status: stat, date: oDate, shift: shift, order_time: oTime, upi_time: uTime, is_doubtful: isDoubtful, note: orderNote, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? dChg : 0 };
+      let iData = { order_id: currentlyEditingOrderId, customer_name: i.restaurant, item_name: i.name, quantity: i.qty, unit_price: i.rate, total: i.total, status: stat, date: oDate, shift: shift, order_time: oTime, upi_time: uTime, note: existingNote, is_doubtful: existingIsDoubtful, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? dChg : 0 };
       if(i.__backendId) { await dbOrders.child(i.__backendId).update(iData); } else { await dbOrders.push().set(iData); }
       isFirst = false;
     }
@@ -723,43 +725,54 @@ window.handlePremiumFormSubmit = async function(event) {
     if (pMode === 'Split') { let sC = (parseFloat($('split-cash').value) || 0) + delChg, sU = parseFloat($('split-upi').value) || 0; fPMode = `Split: Cash ₹${sC.toFixed(2)} | UPI ₹${sU.toFixed(2)}`; }
     const oDate = $('date-filter').value || getLocalIsoDate();
     
-    // 🚨 JADOO: SMART DUPLICATE CATCHER 🚨
+    // 🚨 JADOO: STRICT ALL-FIELD DUPLICATE CATCHER (HARD BLOCK) 🚨
     let duplicateFoundId = null;
     let duplicateItemName = "";
+    let duplicateOrderNo = "";
+    
     for (let item of allItems) {
         let match = allOrders.find(o => 
             (o.date === oDate || String(o.date).includes(oDate)) &&
-            String(o.customer_name).toLowerCase() === String(item.restaurant).toLowerCase() &&
-            String(o.item_name).toLowerCase() === String(item.name).toLowerCase() &&
+            String(o.customer_name).trim().toLowerCase() === String(item.restaurant).trim().toLowerCase() &&
+            String(o.item_name).trim().toLowerCase() === String(item.name).trim().toLowerCase() &&
+            parseFloat(o.quantity) === parseFloat(item.qty) &&
+            parseFloat(o.unit_price) === parseFloat(item.rate) &&
+            String(o.address || '').trim().toLowerCase() === String(addr).trim().toLowerCase() &&
             o.status !== 'Cancelled'
         );
         if (match) {
             duplicateFoundId = match.__backendId;
             duplicateItemName = item.name;
+            duplicateOrderNo = match.order_id;
             break; 
         }
     }
 
     if (duplicateFoundId) {
-        const proceed = confirm(`⚠️ DUPLICATE ALERT!\n\n"${duplicateItemName}" for this restaurant is already added today.\n\nDo you still want to add a new one?`);
-        if (!proceed) {
-            toggleModal(false);
-            
-            // Highlight Table Row Animation
-            setTimeout(() => {
-                const row = document.getElementById(`row-${duplicateFoundId}`);
-                if (row) {
-                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    const originalBg = row.style.backgroundColor;
-                    row.style.transition = 'background-color 0.5s ease';
-                    row.style.backgroundColor = 'rgba(234, 179, 8, 0.4)'; // Yellow Flash
-                    setTimeout(() => { row.style.backgroundColor = originalBg; }, 3000);
-                }
-            }, 300);
-            
-            if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Place Order'; }
-            return; 
-        }
+        // STRICT ERROR ALERTS (NO OPTION TO BYPASS)
+        alert(`🚫 DUPLICATE ENTRY BLOCKED!\n\nOrder for "${duplicateItemName}" with exactly the same details already exists today (Order #${duplicateOrderNo}).\n\nThe system has stopped this entry to prevent a double bill.`);
+        
+        toggleModal(false);
+        
+        setTimeout(() => {
+            const row = document.getElementById(`row-${duplicateFoundId}`);
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const originalBg = row.style.backgroundColor;
+                const originalBorder = row.style.borderLeft;
+                row.style.transition = 'all 0.4s ease';
+                row.style.backgroundColor = 'rgba(239, 68, 68, 0.4)'; // Strong Red Flash
+                row.style.borderLeft = '6px solid #ef4444';
+                
+                setTimeout(() => { 
+                    row.style.backgroundColor = originalBg; 
+                    row.style.borderLeft = originalBorder;
+                }, 4000);
+            }
+        }, 400);
+        
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Place Order'; }
+        return; // STRICT BLOCK
     }
 
     orderCounter++; await dbCounter.set(orderCounter); const cOrderId = String(orderCounter).padStart(3, '0'); let isFirst = true;
@@ -1148,7 +1161,6 @@ function createRowHtml(order, rowColor = null, hideTopBorder = false) {
   let noteDisplay = order.note ? `<div class="mt-1.5 text-[11px] font-bold ${isDoubtful ? 'text-red-200 bg-red-950/80 border border-red-500/50' : 'text-slate-300 bg-[#16181f] border border-slate-600'} px-2 py-1 rounded inline-block w-fit max-w-[200px] truncate" title="${esc(order.note)}">📝 ${esc(order.note)}</div>` : '';
   let doubtFlagIconOpacity = isDoubtful ? 'opacity: 1; color: #ef4444;' : 'opacity: 0.4; color: #9ca3af; filter: grayscale(100%);';
 
-  // 🚨 JADOO: ROW MEIN ID ADD KI TAAKI SCROLL HO SAKE
   return `
   <tr id="row-${order.__backendId}" style="${rowStyle}">
     <td class="px-4 py-3 text-xs whitespace-nowrap">
