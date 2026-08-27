@@ -15,7 +15,7 @@ const dbCounter = database.ref('orderCounter');
 const dbMenu = database.ref('menu'); 
 const dbDailyCash = database.ref('daily_cash'); 
 
-console.log("App Version 40.0 Loaded! STRICT Hard Block for Duplicates Active.");
+console.log("App Version 41.0 Loaded! UPI Unverified Stats Fixed.");
 
 function getLocalIsoDate() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10);
@@ -473,7 +473,6 @@ window.openEditModal = function(backendId) {
       
       if ($('edit-time')) $('edit-time').value = first.order_time || '';
       if ($('edit-upi-time')) $('edit-upi-time').value = first.upi_time || '';
-      
       if ($('edit-doubtful')) $('edit-doubtful').checked = first.is_doubtful || false;
       if ($('edit-note')) $('edit-note').value = first.note || '';
       
@@ -551,9 +550,8 @@ window.handleFullEditSubmit = async function(event) {
     
     const oTime = $('edit-time') ? $('edit-time').value : '';
     const uTime = $('edit-upi-time') ? $('edit-upi-time').value : '';
-
-    let existingNote = originalOrderItems[0].note || '';
-    let existingIsDoubtful = originalOrderItems[0].is_doubtful || false;
+    const isDoubtful = $('edit-doubtful') ? $('edit-doubtful').checked : false;
+    const orderNote = $('edit-note') ? $('edit-note').value.trim() : '';
 
     if(!pMode) throw new Error("Select Payment Mode!"); if(!addr) throw new Error("Delivery Address required!");
     let fPMode = pMode;
@@ -573,7 +571,7 @@ window.handleFullEditSubmit = async function(event) {
       if (fPMode.includes('Split') && !isFirst) {
           itemPaymentStatus = "Split (Included in total)";
       }
-      let iData = { order_id: currentlyEditingOrderId, customer_name: i.restaurant, item_name: i.name, quantity: i.qty, unit_price: i.rate, total: i.total, status: stat, date: oDate, shift: shift, order_time: oTime, upi_time: uTime, note: existingNote, is_doubtful: existingIsDoubtful, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? dChg : 0 };
+      let iData = { order_id: currentlyEditingOrderId, customer_name: i.restaurant, item_name: i.name, quantity: i.qty, unit_price: i.rate, total: i.total, status: stat, date: oDate, shift: shift, order_time: oTime, upi_time: uTime, is_doubtful: isDoubtful, note: orderNote, address: addr, customer_address: addr, location: addr, payment_status: itemPaymentStatus, contact: cont, rider: rider, delivery_charge: isFirst ? dChg : 0 };
       if(i.__backendId) { await dbOrders.child(i.__backendId).update(iData); } else { await dbOrders.push().set(iData); }
       isFirst = false;
     }
@@ -725,7 +723,6 @@ window.handlePremiumFormSubmit = async function(event) {
     if (pMode === 'Split') { let sC = (parseFloat($('split-cash').value) || 0) + delChg, sU = parseFloat($('split-upi').value) || 0; fPMode = `Split: Cash ₹${sC.toFixed(2)} | UPI ₹${sU.toFixed(2)}`; }
     const oDate = $('date-filter').value || getLocalIsoDate();
     
-    // 🚨 JADOO: STRICT ALL-FIELD DUPLICATE CATCHER (HARD BLOCK) 🚨
     let duplicateFoundId = null;
     let duplicateItemName = "";
     let duplicateOrderNo = "";
@@ -749,7 +746,6 @@ window.handlePremiumFormSubmit = async function(event) {
     }
 
     if (duplicateFoundId) {
-        // STRICT ERROR ALERTS (NO OPTION TO BYPASS)
         alert(`🚫 DUPLICATE ENTRY BLOCKED!\n\nOrder for "${duplicateItemName}" with exactly the same details already exists today (Order #${duplicateOrderNo}).\n\nThe system has stopped this entry to prevent a double bill.`);
         
         toggleModal(false);
@@ -761,7 +757,7 @@ window.handlePremiumFormSubmit = async function(event) {
                 const originalBg = row.style.backgroundColor;
                 const originalBorder = row.style.borderLeft;
                 row.style.transition = 'all 0.4s ease';
-                row.style.backgroundColor = 'rgba(239, 68, 68, 0.4)'; // Strong Red Flash
+                row.style.backgroundColor = 'rgba(239, 68, 68, 0.4)'; 
                 row.style.borderLeft = '6px solid #ef4444';
                 
                 setTimeout(() => { 
@@ -772,7 +768,7 @@ window.handlePremiumFormSubmit = async function(event) {
         }, 400);
         
         if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Place Order'; }
-        return; // STRICT BLOCK
+        return; 
     }
 
     orderCounter++; await dbCounter.set(orderCounter); const cOrderId = String(orderCounter).padStart(3, '0'); let isFirst = true;
@@ -838,6 +834,7 @@ window.confirmDelete = async function(bId) { await dbOrders.child(bId).remove();
 window.filterData = function() { currentFilterDate = $('date-filter').value; currentShiftFilter = $('shift-filter') ? $('shift-filter').value : 'All'; currentRestFilter = $('filter-restaurant') ? $('filter-restaurant').value : 'All'; currentRiderFilter = $('filter-rider') ? $('filter-rider').value : 'All'; updateStats(); renderOrders(); }
 function countUniqueOrders(arr) { let s = new Set(); arr.forEach(o => s.add(o.order_id || o.__backendId)); return s.size; }
 
+// 🚨 JADOO: 41.0 FIX - CORRECT CALCULATION FOR ALL BOXES 🚨
 function updateStats() {
   const baseFilteredData = allOrders.filter(o => { 
       const isDateMatch = !currentFilterDate || (o.date && String(o.date).includes(currentFilterDate)); 
@@ -862,7 +859,7 @@ function updateStats() {
 
   const filteredData = baseFilteredData.filter(o => { const isRestMatch = currentRestFilter === 'All' || String(o.customer_name || '').trim() === currentRestFilter; const isRiderMatch = currentRiderFilter === 'All' || String(o.rider || '').trim() === currentRiderFilter; return isRestMatch && isRiderMatch; });
 
-  let upiTotal = 0, cashTotal = 0, pendingTotal = 0, pureSales = 0, totalWithDelivery = 0;
+  let pureSales = 0, totalWithDelivery = 0;
   let ordersGroup = {};
 
   filteredData.forEach(o => {
@@ -888,28 +885,33 @@ function updateStats() {
   });
 
   let riderCashData = {};
-  let riderUpiData = {};
-  let riderTotalDeliveredData = {};
+  let riderUpiVerifiedData = {};
+  let riderUpiUnverifiedData = {};
+  
+  let upiVerifiedAmount = 0, upiUnverifiedAmount = 0, cashAmount = 0, pendingAmount = 0;
 
   Object.values(ordersGroup).forEach(grp => {
       let stat = String(grp.status || "");
       let rider = grp.rider || 'Unassigned';
       
       if (!riderCashData[rider]) riderCashData[rider] = 0;
-      if (!riderUpiData[rider]) riderUpiData[rider] = 0;
-      if (!riderTotalDeliveredData[rider]) riderTotalDeliveredData[rider] = 0;
+      if (!riderUpiVerifiedData[rider]) riderUpiVerifiedData[rider] = 0;
+      if (!riderUpiUnverifiedData[rider]) riderUpiUnverifiedData[rider] = 0;
 
       if (stat === 'UPI Done') { 
-          upiTotal += grp.totalValue; 
-          riderUpiData[rider] += grp.totalValue;
-          riderTotalDeliveredData[rider] += grp.totalValue; 
+          upiVerifiedAmount += grp.totalValue; 
+          riderUpiVerifiedData[rider] += grp.totalValue;
+      }
+      else if (stat === 'UPI (Unverified)') { 
+          upiUnverifiedAmount += grp.totalValue; 
+          riderUpiUnverifiedData[rider] += grp.totalValue;
       }
       else if (stat === 'Cash') { 
-          cashTotal += grp.totalValue; 
+          cashAmount += grp.totalValue; 
           riderCashData[rider] += grp.totalValue;
       }
-      else if (stat === 'Payment Pending' || stat === 'UPI (Unverified)') { 
-          pendingTotal += grp.totalValue; 
+      else if (stat === 'Payment Pending' || stat === 'Pending') { 
+          pendingAmount += grp.totalValue; 
       }
       else if (stat.includes('Split')) {
           const cashMatch = stat.match(/Cash ₹([\d.]+)/);
@@ -918,26 +920,39 @@ function updateStats() {
           let sC = cashMatch ? parseFloat(cashMatch[1]) : 0;
           let sU = upiMatch ? parseFloat(upiMatch[1]) : 0;
           
-          cashTotal += sC;
-          upiTotal += sU;
+          cashAmount += sC;
+          upiVerifiedAmount += sU;
           
           riderCashData[rider] += sC;
-          riderUpiData[rider] += sU;
-          riderTotalDeliveredData[rider] += sU; 
+          riderUpiVerifiedData[rider] += sU;
       }
   });
 
   if ($('total-breakdown-content')) {
-      if (Object.keys(riderTotalDeliveredData).length === 0 || Object.values(riderTotalDeliveredData).every(v => v === 0)) {
-          $('total-breakdown-content').innerHTML = '<div class="text-slate-500 italic mt-1">No UPI deliveries yet</div>';
+      if (Object.keys(riderUpiVerifiedData).length === 0 || Object.values(riderUpiVerifiedData).every(v => v === 0)) {
+          $('total-breakdown-content').innerHTML = '<div class="text-slate-500 italic mt-1">No verified UPI yet</div>';
       } else {
           let html = '';
-          for (let r in riderTotalDeliveredData) {
-              if (riderTotalDeliveredData[r] > 0) {
-                  html += `<div class="flex justify-between items-center gap-6 mb-2 border-b border-slate-700/50 pb-2 last:border-0 last:pb-0"><span class="font-medium text-slate-300 capitalize">${r}</span><span class="font-bold text-white">₹${riderTotalDeliveredData[r].toFixed(2)}</span></div>`;
+          for (let r in riderUpiVerifiedData) {
+              if (riderUpiVerifiedData[r] > 0) {
+                  html += `<div class="flex justify-between items-center gap-6 mb-2 border-b border-slate-700/50 pb-2 last:border-0 last:pb-0"><span class="font-medium text-slate-300 capitalize">${r}</span><span class="font-bold text-white">₹${riderUpiVerifiedData[r].toFixed(2)}</span></div>`;
               }
           }
           $('total-breakdown-content').innerHTML = html;
+      }
+  }
+
+  if ($('upi-breakdown-content')) {
+      if (Object.keys(riderUpiUnverifiedData).length === 0 || Object.values(riderUpiUnverifiedData).every(v => v === 0)) {
+          $('upi-breakdown-content').innerHTML = '<div class="text-slate-500 italic mt-1">No unverified UPI</div>';
+      } else {
+          let html = '';
+          for (let r in riderUpiUnverifiedData) {
+              if (riderUpiUnverifiedData[r] > 0) {
+                  html += `<div class="flex justify-between items-center gap-6 mb-2 border-b border-slate-700/50 pb-2 last:border-0 last:pb-0"><span class="font-medium text-slate-300 capitalize">${r}</span><span class="font-bold text-white">₹${riderUpiUnverifiedData[r].toFixed(2)}</span></div>`;
+              }
+          }
+          $('upi-breakdown-content').innerHTML = html;
       }
   }
 
@@ -955,36 +970,35 @@ function updateStats() {
       }
   }
 
-  if ($('upi-breakdown-content')) {
-      if (Object.keys(riderUpiData).length === 0 || Object.values(riderUpiData).every(v => v === 0)) {
-          $('upi-breakdown-content').innerHTML = '<div class="text-slate-500 italic mt-1">No UPI received</div>';
-      } else {
-          let html = '';
-          for (let r in riderUpiData) {
-              if (riderUpiData[r] > 0) {
-                  html += `<div class="flex justify-between items-center gap-6 mb-2 border-b border-slate-700/50 pb-2 last:border-0 last:pb-0"><span class="font-medium text-slate-300 capitalize">${r}</span><span class="font-bold text-white">₹${riderUpiData[r].toFixed(2)}</span></div>`;
-              }
-          }
-          $('upi-breakdown-content').innerHTML = html;
-      }
-  }
-
   const activeOrders = filteredData.filter(o => o.status !== 'Cancelled');
   
-  const deliveredCashOrders = activeOrders.filter(o => o.payment_status === 'Cash' || String(o.payment_status || '').includes('Split'));
-  const deliveredUpiOrders = activeOrders.filter(o => o.payment_status === 'UPI Done' || String(o.payment_status || '').includes('Split'));
-  const pendingOrders = activeOrders.filter(o => o.payment_status === 'Payment Pending' || o.payment_status === 'UPI (Unverified)');
+  const verifiedUpiOrders = activeOrders.filter(o => o.payment_status === 'UPI Done' || String(o.payment_status || '').includes('Split'));
+  const cashOrders = activeOrders.filter(o => o.payment_status === 'Cash' || String(o.payment_status || '').includes('Split'));
+  const unverifiedUpiOrders = activeOrders.filter(o => o.payment_status === 'UPI (Unverified)');
+  const pendingOrders = activeOrders.filter(o => o.payment_status === 'Payment Pending' || o.payment_status === 'Pending');
 
-  if ($('stat-sales-inr')) $('stat-sales-inr').textContent = '₹' + pureSales.toFixed(2); if ($('stat-sales-delivery')) $('stat-sales-delivery').textContent = '₹' + totalWithDelivery.toFixed(2);
-  if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = countUniqueOrders(deliveredCashOrders); if ($('stat-delivered-cash-total')) $('stat-delivered-cash-total').textContent = '₹' + cashTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-  currentTotalCash = cashTotal; updatePendingCashUI();
+  if ($('stat-sales-inr')) $('stat-sales-inr').textContent = '₹' + pureSales.toFixed(2); 
+  if ($('stat-sales-delivery')) $('stat-sales-delivery').textContent = '₹' + totalWithDelivery.toFixed(2);
   
-  if ($('stat-delivered-upi')) $('stat-delivered-upi').textContent = countUniqueOrders(deliveredUpiOrders); if ($('stat-delivered-upi-total')) $('stat-delivered-upi-total').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  // BOX 1: UPI VERIFIED
+  if ($('stat-delivered')) $('stat-delivered').textContent = countUniqueOrders(verifiedUpiOrders); 
+  if ($('stat-delivered-total')) $('stat-delivered-total').textContent = '₹' + upiVerifiedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   
-  if ($('stat-delivered')) $('stat-delivered').textContent = countUniqueOrders(deliveredUpiOrders); 
-  if ($('stat-delivered-total')) $('stat-delivered-total').textContent = '₹' + upiTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  // BOX 2: CASH
+  if ($('stat-delivered-cash')) $('stat-delivered-cash').textContent = countUniqueOrders(cashOrders); 
+  if ($('stat-delivered-cash-total')) $('stat-delivered-cash-total').textContent = '₹' + cashAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 });
   
-  if ($('stat-payment-pending')) $('stat-payment-pending').textContent = countUniqueOrders(pendingOrders); if ($('stat-payment-pending-total')) $('stat-payment-pending-total').textContent = '₹' + pendingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  currentTotalCash = cashAmount; 
+  updatePendingCashUI();
+  
+  // BOX 3: UPI UNVERIFIED (Fixed logic applies here)
+  if ($('stat-delivered-upi')) $('stat-delivered-upi').textContent = countUniqueOrders(unverifiedUpiOrders); 
+  if ($('stat-delivered-upi-total')) $('stat-delivered-upi-total').textContent = '₹' + upiUnverifiedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  
+  // BOX 4: PENDING
+  if ($('stat-payment-pending')) $('stat-payment-pending').textContent = countUniqueOrders(pendingOrders); 
+  if ($('stat-payment-pending-total')) $('stat-payment-pending-total').textContent = '₹' + pendingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  
   if ($('stat-total-orders')) $('stat-total-orders').textContent = countUniqueOrders(activeOrders);
 
   let riderData = {}, totalRiderSales = 0; const PER_ORDER_RATE = $('rider-rate-input') ? (parseFloat($('rider-rate-input').value) || 0) : 25;
